@@ -1,10 +1,16 @@
+Require Import Arith.
+Require Import Omega.
+Require Import Recdef.
 Require Import ZArith.
 Require FMapList.
 Require Import OrderedType OrderedTypeEx.
+Require Import Strings.String.
+Require Import Strings.Ascii.
 Import ListNotations.
 
+(* BF Program Type *)
 Inductive BF : Set :=
-| bf_eof : BF
+| bf_end : BF
 | bf_right : BF -> BF (* > *)
 | bf_left : BF -> BF  (* < *)
 | bf_inc : BF -> BF   (* + *)
@@ -13,6 +19,105 @@ Inductive BF : Set :=
 | bf_in : BF -> BF    (* , *)
 | bf_loop : BF -> BF -> BF.  (* [...] *)
 
+(* TODO: Print AST *)
+(* Function bf_str_state_size (state: BF * list BF): nat := *)
+(*   0. *)
+
+(* Function string_of_bf (state: BF * list BF) *)
+(*          {measure bf_str_state_size state}: string := *)
+(*   let (bf, stack) := state in *)
+(*   match bf with *)
+(*   | bf_end => *)
+(*     match stack with *)
+(*     | [] => EmptyString *)
+(*     | bf' :: stack' => String "]" (string_of_bf (bf', stack')) *)
+(*     end *)
+(*   | bf_right bf' => String ">" (string_of_bf (bf', stack)) *)
+(*   | bf_left bf' => String "<" (string_of_bf (bf', stack)) *)
+(*   | bf_inc bf' => String "+" (string_of_bf (bf', stack)) *)
+(*   | bf_dec bf' => String "-" (string_of_bf (bf', stack)) *)
+(*   | bf_out bf' => String "." (string_of_bf (bf', stack)) *)
+(*   | bf_in bf' => String "," (string_of_bf (bf', stack)) *)
+(*   | bf_loop inner bf' => String "[" (string_of_bf (inner, bf' :: stack)) *)
+(*   end. *)
+
+(* BF Parsing *)
+Inductive ParseState: Type :=
+| parse_ok (str: string) (acc: BF) (stack: list BF)
+| parse_eof (acc: BF) (stack: list BF)
+| parse_error.
+
+Function parse_state_size (state: ParseState): nat :=
+  match state with
+  | parse_ok str _ _  => String.length str
+  | parse_eof _ _ | parse_error => 0
+  end.
+
+Function bf_parse (state: ParseState)
+         {measure parse_state_size state}: ParseState :=
+  match state with
+  | parse_error
+  | parse_eof _ _ => parse_error
+  | parse_ok str acc stack =>
+    match str with
+    | EmptyString => parse_eof acc stack
+    | String ">" str' => bf_parse (parse_ok str' (bf_right acc) stack)
+    | String "<" str' => bf_parse (parse_ok str' (bf_left acc) stack)
+    | String "+" str' => bf_parse (parse_ok str' (bf_inc acc) stack)
+    | String "-" str' => bf_parse (parse_ok str' (bf_dec acc) stack)
+    | String "." str' => bf_parse (parse_ok str' (bf_out acc) stack)
+    | String "," str' => bf_parse (parse_ok str' (bf_in acc) stack)
+    | String "]" str' => bf_parse (parse_ok str' bf_end (acc :: stack))
+    | String "[" str' =>
+      match stack with
+      | [] => parse_error
+      | acc' :: stack' => bf_parse (parse_ok str' (bf_loop acc acc') stack')
+      end
+    | String _ str' => bf_parse (parse_ok str' acc stack)
+    end
+  end.
+Proof.
+  all: intros; subst; unfold parse_state_size; simpl; auto.
+Defined.
+
+Function rev_string (acc: string) (str: string): string :=
+  match str with
+  | EmptyString => acc
+  | String c str' => rev_string (String c acc) str'
+  end.
+
+Function parse_bf (bf: string): option BF :=
+  match bf_parse (parse_ok (rev_string EmptyString bf) bf_end []) with
+  | parse_ok _ _ _ | parse_error => None
+  | parse_eof _ (_ :: _) => None
+  | parse_eof ast [] => Some ast
+  end.
+
+Example parse_all_bf_commands:
+  parse_bf "[><+-.,]" =
+  Some (bf_loop
+          (bf_right (bf_left (bf_inc (bf_dec (bf_out (bf_in bf_end))))))
+          bf_end).
+auto.
+
+Example parse_nesting_bf:
+  parse_bf "[[[][]]][]" =
+  Some (bf_loop
+          (bf_loop
+             (bf_loop bf_end (bf_loop bf_end bf_end))
+             bf_end)
+          (bf_loop bf_end bf_end)).
+auto.
+
+Example parse_bf_bad_left:
+  parse_bf "[[]" = None.
+auto.
+
+Example parse_bf_bad_right:
+  parse_bf "[]]" = None.
+auto.
+
+(* BF Interpreter *)
 (* A BFTape is a map from [nat] indices to [Z] values *)
 Module NatMap := FMapList.Make Nat_as_OT.
 Definition BFTape := NatMap.t Z.
@@ -43,20 +148,8 @@ Inductive BFState : Type :=
            (input: list Z)
            (output: list Z).
 
-Function state_bf (state: BFState): BF :=
-  match state with bf_state bf _ _ _ _ _ => bf end.
-
-Function state_resets (state: BFState): list BF :=
-  match state with bf_state _ resets _ _ _ _ => resets end.
-
-Function state_ptr (state: BFState): nat :=
-  match state with bf_state _ _ ptr _ _ _ => ptr end.
-
-Function state_tape (state: BFState): BFTape :=
-  match state with bf_state _ _ _ tape _ _ => tape end.
-
-Function state_input (state: BFState): list Z :=
-  match state with bf_state _ _ _ _ input _ => input end.
+Function state_init (bf: BF) (input: list Z): BFState :=
+  bf_state bf [] 0 (NatMap.empty Z) input [].
 
 Function state_output (state: BFState): list Z :=
   match state with bf_state _ _ _ _ _ output => output end.
@@ -65,7 +158,7 @@ Function bf_step (state: BFState): option BFState :=
   match state with
   | bf_state bf resets ptr tape input output =>
     match bf with
-     | bf_eof =>
+     | bf_end =>
        match resets with
         | [] => None
         | bf' :: resets' =>
@@ -96,6 +189,7 @@ Function bf_step (state: BFState): option BFState :=
      end
   end.
 
+(* TODO: Use N as fuel with {measure N.to_nat fuel} *)
 Function bf_run (state: BFState) (fuel: nat): option (list Z) :=
   match fuel with
   | 0 => None
@@ -105,3 +199,53 @@ Function bf_run (state: BFState) (fuel: nat): option (list Z) :=
     | Some state' => bf_run state' f
     end
   end.
+
+Function z_of_ascii (a: ascii): Z :=
+  Z.of_nat (nat_of_ascii a).
+
+Function ascii_of_z (z: Z): option ascii :=
+  match z with
+  | Zpos p => Some (ascii_of_pos p)
+  | _ => None
+  end.
+
+Function opt_list_len {A: Type} (l: option (list A)): nat :=
+  match l with
+  | Some l => List.length l
+  | None => 0
+  end.
+
+Function string_of_zs (out: list Z): string :=
+  match out with
+  | [] => EmptyString
+  | z :: zs' =>
+    match ascii_of_z z with
+    | None => EmptyString
+    | Some a => String a (string_of_zs zs')
+    end
+  end.
+
+Function zs_of_string (str: string): list Z :=
+  match str with
+  | EmptyString => []
+  | String a str' => z_of_ascii a :: (zs_of_string str')
+  end.
+
+(* The important interpreter as far as the spec is concerned *)
+Function interpret_bf (prog: string) (zs: list Z) (f: nat): option (list Z) :=
+  match parse_bf prog with
+  | None => None
+  | Some bf => bf_run (state_init bf zs) f
+  end.
+
+Function interpret_bf_readable (prog: string) (input: string) (f:nat): string :=
+  match interpret_bf prog (zs_of_string input) f with
+  | None => EmptyString
+  | Some zs => string_of_zs zs
+  end.
+
+Example hello_world_bf:
+  interpret_bf_readable "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.
+                        +++++++..+++.>++.<<+++++++++++++++.>.+++.------.
+                        --------.>+. newline in next cell" "" 401 =
+  "Hello World!"%string. auto.
