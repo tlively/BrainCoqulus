@@ -78,11 +78,8 @@ Admitted.
 Lemma paren_print_parse_state_inverse (p: Paren):
   parse_paren_state (print_paren p) = ok p [].
 Proof.
-  induction p.
-  - now rewrite print_paren_equation, parse_paren_state_equation.
-  - rewrite print_paren_equation, parse_paren_state_equation.
-    now rewrite IHp.
-  - now apply (paren_print_parse_parens _ _ p1 p2).
+  induction p; rewrite print_paren_equation, parse_paren_state_equation;
+    [| rewrite IHp | apply (paren_print_parse_parens _ _ p1 p2)]; auto.
 Qed.
 
 Theorem paren_print_parse_inverse (p: Paren):
