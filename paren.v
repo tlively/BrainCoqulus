@@ -66,9 +66,8 @@ auto. Qed.
 
 (* TODO: Prove this *)
 Lemma paren_print_parse_parens (p1 p2: Paren):
-  forall p1' p2',
-    parse_paren_state (print_paren p1) = ok p1' [] ->
-    parse_paren_state (print_paren p2) = ok p2' [] ->
+    parse_paren_state (print_paren p1) = ok p1 [] ->
+    parse_paren_state (print_paren p2) = ok p2 [] ->
     parse_paren_state (pnode_open :: (print_paren p1) ++ [pnode_close]
                                   ++ (print_paren p2))
     = ok (paren p1 p2) [].
@@ -79,7 +78,7 @@ Lemma paren_print_parse_state_inverse (p: Paren):
   parse_paren_state (print_paren p) = ok p [].
 Proof.
   induction p; rewrite print_paren_equation, parse_paren_state_equation;
-    [| rewrite IHp | apply (paren_print_parse_parens _ _ p1 p2)]; auto.
+    [| rewrite IHp | apply (paren_print_parse_parens)]; auto.
 Qed.
 
 Theorem paren_print_parse_inverse (p: Paren):
