@@ -6,6 +6,13 @@ Inductive Paren :=
 | paren_nop (p: Paren)
 | paren (inner p: Paren).
 
+Function paren_append (p1 p2: Paren) :=
+  match p1 with
+  | paren_end => p2
+  | paren_nop p' => paren_nop (paren_append p' p2)
+  | paren inner p' => paren inner (paren_append p' p2)
+  end.
+
 Inductive ParenNode :=
 | pnode_open
 | pnode_nop
@@ -23,11 +30,14 @@ Inductive ParenParseState :=
 | ok (next: Paren) (stack: list Paren)
 | error.
 
-Function parse_paren_state (ps: list ParenNode): ParenParseState :=
+Definition parse_init := ok paren_end [].
+
+Function parse_paren_state (init_state: ParenParseState)
+         (ps: list ParenNode): ParenParseState :=
   match ps with
-  | [] => ok paren_end []
+  | [] => init_state
   | hd :: tl =>
-    match parse_paren_state tl with
+    match parse_paren_state init_state tl with
     | error => error
     | ok cur stack =>
       match hd with
@@ -43,7 +53,7 @@ Function parse_paren_state (ps: list ParenNode): ParenParseState :=
   end.
 
 Function parse_paren (ps: list ParenNode): option Paren :=
-  match parse_paren_state ps with
+  match parse_paren_state parse_init ps with
   | error => None
   | ok p (_ :: _) => None
   | ok p [] => Some p
@@ -64,20 +74,37 @@ Example paren_print_parse_nesting:
   parse_paren (print_paren prog) = Some prog.
 auto. Qed.
 
+Lemma paren_parse_app (state: ParenParseState) (str1 str2: list ParenNode):
+  parse_paren_state state (str1 ++ str2) =
+  parse_paren_state (parse_paren_state state str2) str1.
+Proof.
+  revert state str2.
+  induction str1; intros; auto.
+  rewrite <- app_comm_cons.
+  rewrite parse_paren_state_equation.
+  symmetry.
+  rewrite parse_paren_state_equation.
+  now rewrite <- IHstr1.
+Qed.
+
+Lemma paren_print_parse_app (p1 p2: Paren):
+  parse_paren_state parse_init (print_paren p2
+
 (* TODO: Prove this *)
 Lemma paren_print_parse_parens (p1 p2: Paren):
-    parse_paren_state (print_paren p1) = ok p1 [] ->
-    parse_paren_state (print_paren p2) = ok p2 [] ->
-    parse_paren_state (pnode_open :: (print_paren p1) ++ [pnode_close]
+    parse_paren_state parse_init (print_paren p1) = ok p1 [] ->
+    parse_paren_state parse_init (print_paren p2) = ok p2 [] ->
+    parse_paren_state parse_init (pnode_open :: (print_paren p1) ++ [pnode_close]
                                   ++ (print_paren p2))
     = ok (paren p1 p2) [].
 Proof.
 Admitted.
 
 Lemma paren_print_parse_state_inverse (p: Paren):
-  parse_paren_state (print_paren p) = ok p [].
+  parse_paren_state parse_init (print_paren p) = ok p [].
 Proof.
-  induction p; rewrite print_paren_equation, parse_paren_state_equation;
+  induction p; unfold parse_init in *;
+    rewrite print_paren_equation, parse_paren_state_equation;
     [| rewrite IHp | apply (paren_print_parse_parens)]; auto.
 Qed.
 
