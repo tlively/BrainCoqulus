@@ -174,10 +174,10 @@ Inductive BFState : Type :=
            (input: list Z)
            (output: list Z).
 
-Function state_init (bf: BF) (input: list Z): BFState :=
+Function bf_state_init (bf: BF) (input: list Z): BFState :=
   bf_state bf [] 0 (NatMap.empty Z) input [].
 
-Function state_output (state: BFState): list Z :=
+Function bf_state_output (state: BFState): list Z :=
   match state with bf_state _ _ _ _ _ output => output end.
 
 Function bf_step (state: BFState): option BFState :=
@@ -221,7 +221,7 @@ Function bf_run (state: BFState) (fuel: nat): option (list Z) :=
   | 0 => None
   | S f =>
     match bf_step state with
-    | None => Some (state_output state)
+    | None => Some (bf_state_output state)
     | Some state' => bf_run state' f
     end
   end.
@@ -261,7 +261,7 @@ Function zs_of_string (str: string): list Z :=
 Function interpret_bf (prog: string) (zs: list Z) (f: nat): option (list Z) :=
   match parse_bf prog with
   | None => None
-  | Some bf => bf_run (state_init bf zs) f
+  | Some bf => bf_run (bf_state_init bf zs) f
   end.
 
 Function interpret_bf_readable (prog: string) (input: string) (f:nat): string :=

@@ -14,46 +14,9 @@ Load parse.
 (* Lambda Calculus with 0-indexed De Bruijn indices *)
 Inductive Lambda : Set :=
 | l_var : nat -> Lambda
+| l_out : Lambda -> Lambda
 | l_lam : Lambda -> Lambda
 | l_app : Lambda -> Lambda -> Lambda.
-
-Function lambda_replace (e: Lambda) (x: Lambda) (n: nat): Lambda :=
-  match e with
-  | l_var m => if m =? n then x else e
-  | l_lam e' => l_lam (lambda_replace e' x (S n))
-  | l_app e1 e2 => l_app (lambda_replace e1 x n) (lambda_replace e2 x n)
-  end.
-
-(* TODO: Do we want CBV instead? *)
-Function lambda_step (e: Lambda): option Lambda :=
-  match e with
-  | l_var _ => None
-  | l_lam e' =>
-    match lambda_step e' with
-    | Some e'' => Some (l_lam e'')
-    | None => None
-    end
-  | l_app (l_lam e1) e2 => Some (lambda_replace e1 e2 0)
-  | l_app e1 e2 =>
-    match lambda_step e1 with
-    | Some e1' => Some (l_app e1' e2)
-    | None =>
-      match lambda_step e2 with
-      | Some e2' => Some (l_app e1 e2')
-      | None => None
-      end
-    end
-  end.
-
-Function lambda_run (e: Lambda) (fuel: nat): option Lambda :=
-  match fuel with
-  | 0 => None
-  | S f =>
-    match lambda_step e with
-    | None => Some e
-    | Some e' => lambda_run e' f
-    end
-  end.
 
 Section LambdaParsing.
 
@@ -61,6 +24,7 @@ Section LambdaParsing.
   | lam_end
   | lam_lam (t: LambdaTree)
   | lam_dot (t: LambdaTree)
+  | lam_out (t: LambdaTree)
   | lam_wsp (t: LambdaTree)
   | lam_id (str: string) (t: LambdaTree)
   | lam_paren (inner: LambdaTree) (t: LambdaTree).
@@ -85,6 +49,7 @@ Section LambdaParsing.
           end
         | "\"%char => Parse.ok (lam_lam cur) stack
         | "."%char => Parse.ok (lam_dot cur) stack
+        | "^"%char => Parse.ok (lam_out cur) stack
         | ")"%char => Parse.ok (lam_end) (cur :: stack)
         | "("%char =>
           match stack with
@@ -106,6 +71,7 @@ Section LambdaParsing.
     | lam_wsp t' => lambda_strip_wsp t'
     | lam_lam t' => lam_lam (lambda_strip_wsp t')
     | lam_dot t' => lam_dot (lambda_strip_wsp t')
+    | lam_out t' => lam_out (lambda_strip_wsp t')
     | lam_id s t' => lam_id s (lambda_strip_wsp t')
     | lam_paren inner t' =>
       lam_paren (lambda_strip_wsp inner) (lambda_strip_wsp t')
@@ -114,6 +80,7 @@ Section LambdaParsing.
   Local Inductive NamedLambda : Set :=
   | nl_var (s: string)
   | nl_lam (s: string) (e: NamedLambda)
+  | nl_out (e: NamedLambda)
   | nl_app (e1: NamedLambda) (e2: NamedLambda).
 
   Function app_of_lambda_list (ls: list NamedLambda) {measure List.length ls}:
@@ -132,11 +99,16 @@ Section LambdaParsing.
     | lam_end => app_of_lambda_list (rev acc)
     | lam_wsp _ => None
     | lam_lam (lam_id s (lam_dot t')) =>
-      match  named_lambda_of_tree [] t' with
+      match named_lambda_of_tree [] t' with
       | None => None
       | Some e => Some (nl_lam s e)
       end
     | lam_lam _ | lam_dot _ => None
+    | lam_out t' =>
+      match named_lambda_of_tree [] t' with
+      | None => None
+      | Some e => Some (nl_out e)
+      end
     | lam_id s t' => named_lambda_of_tree (nl_var s :: acc) t'
     | lam_paren inner t' =>
       match named_lambda_of_tree [] inner with
@@ -165,6 +137,10 @@ Section LambdaParsing.
   Example named_false:
     parse_named_lambda " \ x . \ y  .  (y  ) " =
     Some (nl_lam "x" (nl_lam "y" (nl_var "y"))).
+  auto. Qed.
+
+  Example named_out:
+    parse_named_lambda "\x.^x" = Some (nl_lam "x" (nl_out (nl_var "x"))).
   auto. Qed.
 
   Example named_Y:
@@ -218,14 +194,17 @@ Section LambdaParsing.
       | None => None
       end
     | nl_lam x e =>
-      let stripped := lambda_strip_names e (x :: xs) in
-      match stripped with
+      match lambda_strip_names e (x :: xs) with
       | Some e' => Some (l_lam e')
       | None => None
       end
+    | nl_out e =>
+      match lambda_strip_names e xs with
+      | Some e' => Some (l_out e')
+      | None => None
+      end
     | nl_app e1 e2 =>
-      let stripped := (lambda_strip_names e1 xs, lambda_strip_names e2 xs) in
-      match stripped with
+      match (lambda_strip_names e1 xs, lambda_strip_names e2 xs) with
       | (Some e1', Some e2') => Some (l_app e1' e2')
       | _ => None
       end
@@ -248,6 +227,10 @@ Section LambdaParsing.
     parse_lambda " \ x . \ y  .  (y  ) " =  Some (l_lam (l_lam (l_var 0))).
   auto. Qed.
 
+  Example lambda_out:
+    parse_lambda "\x.^x" = Some (l_lam (l_out (l_var 0))).
+  auto. Qed.
+
   Example lambda_Y:
     parse_lambda "\f.(\x.f (x x)) (\x.f (x x))" =
     let fn_app := l_app (l_var 1) (l_app (l_var 0) (l_var 0)) in
@@ -263,3 +246,134 @@ Section LambdaParsing.
   auto. Qed.
 
 End LambdaParsing.
+
+Function lambda_replace (e: Lambda) (x: Lambda) (n: nat): Lambda :=
+  match e with
+  | l_var m => if m =? n then x else e
+  | l_lam e' => l_lam (lambda_replace e' x (S n))
+  | l_out e' => l_out (lambda_replace e' x n)
+  | l_app e1 e2 => l_app (lambda_replace e1 x n) (lambda_replace e2 x n)
+  end.
+
+Function count_apps (e: Lambda): option nat :=
+  match e with
+  | l_var 0 => Some 0
+  | l_app (l_var 1) e' =>
+    match count_apps e' with
+    | Some n => Some (S n)
+    | None => None
+    end
+  | _ => None
+  end.
+
+Function nat_of_lambda (e: Lambda): option nat :=
+  match e with
+  | l_lam (l_lam e') => count_apps e'
+  | _ => None
+  end.
+
+(* Call by value semantics *)
+Function lambda_step (e: Lambda): (option Lambda * option nat) :=
+  match e with
+  | l_var _ => (None, None)
+  | l_lam e' => (None, None)
+  | l_out e' =>
+    match lambda_step e' with
+    | (Some e'', n) => (Some (l_out e''), n)
+    | (None, None) => (Some e', nat_of_lambda e')
+    | (None, _) => (None, None)
+    end
+  | l_app e1 e2 =>
+    match lambda_step e1 with
+    | (Some e1', n) => (Some (l_app e1' e2), n)
+    | (None, _) =>
+      match lambda_step e2 with
+      | (Some e2', n) => (Some (l_app e1 e2'), n)
+      | (None, _) =>
+        match e1 with
+        | l_lam e1' => (Some (lambda_replace e1' e2 0), None)
+        | _ => (None, None)
+        end
+      end
+    end
+  end.
+
+Inductive LambdaState :=
+| lambda_state (output: list nat) (l: Lambda).
+
+
+(* TODO: test me *)
+Function lambda_run (state: LambdaState) (fuel: nat): option (list nat) :=
+  match fuel with
+  | 0 => None
+  | S f =>
+    match state with
+    | lambda_state out e =>
+      match lambda_step e with
+      | (Some e', None) => lambda_run (lambda_state out e') f
+      | (Some e', Some n) => lambda_run (lambda_state (out ++ [n]) e') f
+      | (None, _) => Some out
+      end
+    end
+  end.
+
+Definition l_id := l_lam (l_var 0).
+
+Function parse_def (s: string): Lambda :=
+  match parse_lambda s with
+  | Some l => l
+  | None => l_id
+  end.
+
+(* TODO: test/prove these *)
+Definition l_zero := parse_def "\f.\x.x".
+Definition l_succ := parse_def "\n.\f.\x.f (n f x)".
+Definition l_true := parse_def "\x.\y.x".
+Definition l_false := parse_def "\x.\y.y".
+Definition l_empty := parse_def "\f.f (\x.\y.\x) (\x.x)".
+Definition l_cons := parse_def "\a.\l.\f.f (\x.\y.y) (\f.f a l)".
+Definition l_isempty := parse_def "\l.l (\x.\y.x)".
+Definition l_head := parse_def "\l.l (\x.\y.y) (\x.\y.y)".
+Definition l_tail := parse_def "\l.l (\x.\y.y) (\x.\y.y)".
+
+Function lambda_of_nat (n: nat): Lambda :=
+  match n with
+  | 0 => l_zero
+  | S n' => l_app l_succ (lambda_of_nat n')
+  end.
+
+(* TODO: Reduce before returning *)
+Function lambda_of_nats (ns: list nat): Lambda :=
+  match ns with
+  | [] => l_empty
+  | hd :: tl => l_app (l_app l_cons (lambda_of_nat hd)) (lambda_of_nats tl)
+  end.
+
+(* The important interpreter as far as the spec is concerned *)
+Function interpret_lambda (prog: string) (input: list nat) (f: nat):
+  option (list nat) :=
+  match parse_lambda prog with
+  | None => None
+  | Some l => lambda_run (lambda_state [] (l_app l (lambda_of_nats input))) f
+  end.
+
+Function nats_of_string (str: string): list nat :=
+  match str with
+  | EmptyString => []
+  | String a str' => nat_of_ascii a :: (nats_of_string str')
+  end.
+
+Function string_of_nats (ns: list nat): string :=
+  match ns with
+  | [] => EmptyString
+  | n :: ns' => String (ascii_of_nat n) (string_of_nats ns')
+  end.
+
+Function interpret_lambda_readable (prog: string) (input: string) (f: nat):
+  string :=
+  match interpret_lambda prog (nats_of_string input) f with
+  | None => EmptyString
+  | Some ns => string_of_nats ns
+  end.
+
+(* TODO: Hello world *)
