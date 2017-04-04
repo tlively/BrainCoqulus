@@ -87,10 +87,37 @@ Proof.
   now rewrite <- IHstr1.
 Qed.
 
-Lemma paren_print_parse_app (p1 p2: Paren):
-  parse_paren_state parse_init (print_paren p2
+Lemma paren_print_parse_paren (p: Paren):
+  parse_paren_state parse_init (print_paren p) = ok p [] ->
+  parse_paren_state parse_init (pnode_open :: (print_paren p) ++ [pnode_close])
+  = ok (paren p paren_end) [].
+Proof.
+  intros; simpl in *.
+  rewrite paren_parse_app.
+  simpl in *.
+  induction (print_paren p).
+  - simpl in *.
+    unfold parse_init in *.
+    now replace p with paren_end in * by congruence.
+  - destruct a; simpl in *.
+    + destruct (parse_paren_state parse_init l).
+      * destruct stack; try discriminate.
+Admitted.
 
-(* TODO: Prove this *)
+Lemma paren_print_parse_app (s1 s2: list ParenNode) (p1 p2: Paren)
+      (stack: list Paren):
+  parse_paren_state parse_init (s1) = ok p1 [] ->
+  parse_paren_state parse_init (s2) = ok p2 [] ->
+  parse_paren_state parse_init (s1 ++ s2) =
+  ok (paren_append p1 p2) stack.
+Proof.
+  intros.
+  rewrite paren_parse_app.
+  rewrite H0; clear H0.
+  revert p1 H p2 stack.
+  induction s1; intros.
+Admitted.
+
 Lemma paren_print_parse_parens (p1 p2: Paren):
     parse_paren_state parse_init (print_paren p1) = ok p1 [] ->
     parse_paren_state parse_init (print_paren p2) = ok p2 [] ->
@@ -98,7 +125,13 @@ Lemma paren_print_parse_parens (p1 p2: Paren):
                                   ++ (print_paren p2))
     = ok (paren p1 p2) [].
 Proof.
-Admitted.
+  intros.
+  rewrite app_assoc.
+  rewrite app_comm_cons.
+  replace (paren p1 p2) with (paren_append (paren p1 paren_end) p2) by auto.
+  apply paren_print_parse_app; auto.
+  apply paren_print_parse_paren; auto.
+Qed.
 
 Lemma paren_print_parse_state_inverse (p: Paren):
   parse_paren_state parse_init (print_paren p) = ok p [].

@@ -9,6 +9,8 @@ Require Import Strings.Ascii.
 Require Import Coq.Program.Tactics.
 Import ListNotations.
 
+Load parse.
+
 (* BF Program Type *)
 Inductive BF : Set :=
 | bf_end : BF
@@ -35,14 +37,8 @@ Section BFPrinting.
       "["%char :: (chars_of_bf inner) ++ ["]"%char] ++ (chars_of_bf bf')
     end.
 
-  Function string_of_chars (l: list ascii): string :=
-    match l with
-    | [] => EmptyString
-    | a :: l' => String a (string_of_chars l')
-    end.
-
   Function print_bf (bf: BF): string :=
-    string_of_chars (chars_of_bf bf).
+    Parse.string_of_chars (chars_of_bf bf).
 
   Example print_all_bf_commands:
     print_bf
@@ -56,46 +52,39 @@ End BFPrinting.
 
 Section BFParsing.
 
-  Inductive ParseState: Type :=
-  | parse_ok (cur: BF) (stack: list BF)
-  | parse_error.
+  Local Definition ParseState := @Parse.ParseState BF.
+  Local Definition chars_of_string := Parse.chars_of_string.
 
   Function parse_bf_state (l: list ascii): ParseState :=
     match l with
-    | [] => parse_ok bf_end []
+    | [] => Parse.ok bf_end []
     | hd :: tl =>
       match parse_bf_state tl with
-      | parse_error => parse_error
-      | parse_ok cur stack =>
+      | Parse.error => Parse.error
+      | Parse.ok cur stack =>
         match hd with
-        | ">"%char => parse_ok (bf_right cur) stack
-        | "<"%char => parse_ok (bf_left cur) stack
-        | "+"%char => parse_ok (bf_inc cur) stack
-        | "-"%char => parse_ok (bf_dec cur) stack
-        | "."%char => parse_ok (bf_out cur) stack
-        | ","%char => parse_ok (bf_in cur) stack
-        | "]"%char => parse_ok bf_end (cur :: stack)
+        | ">"%char => Parse.ok (bf_right cur) stack
+        | "<"%char => Parse.ok (bf_left cur) stack
+        | "+"%char => Parse.ok (bf_inc cur) stack
+        | "-"%char => Parse.ok (bf_dec cur) stack
+        | "."%char => Parse.ok (bf_out cur) stack
+        | ","%char => Parse.ok (bf_in cur) stack
+        | "]"%char => Parse.ok bf_end (cur :: stack)
         | "["%char =>
           match stack with
-          | [] => parse_error
-          | next :: stack' => parse_ok (bf_loop cur next) stack'
+          | [] => Parse.error
+          | next :: stack' => Parse.ok (bf_loop cur next) stack'
           end
-        | _ => parse_ok cur stack
+        | _ => Parse.ok cur stack
         end
       end
     end.
 
-  Function chars_of_string (str: string): list ascii :=
-    match str with
-    | EmptyString => []
-    | String a str' => a :: (chars_of_string str')
-    end.
-
   Function parse_bf (str: string): option BF :=
     match parse_bf_state (chars_of_string str) with
-    | parse_error => None
-    | parse_ok _ (_ :: _) => None
-    | parse_ok bf [] => Some bf
+    | Parse.error => None
+    | Parse.ok _ (_ :: _) => None
+    | Parse.ok bf [] => Some bf
     end.
 
   Example parse_all_bf_commands:
@@ -130,16 +119,16 @@ End BFParsing.
 
 Lemma bf_print_parse_loop (bf1 bf2: BF):
   forall bf1' bf2',
-    parse_bf_state (chars_of_bf bf1) = parse_ok bf1' [] ->
-    parse_bf_state (chars_of_bf bf2) = parse_ok bf2' [] ->
+    parse_bf_state (chars_of_bf bf1) = Parse.ok bf1' [] ->
+    parse_bf_state (chars_of_bf bf2) = Parse.ok bf2' [] ->
     parse_bf_state ("["%char :: (chars_of_bf bf1) ++ ["]"%char]
                                   ++ (chars_of_bf bf2))
-    = parse_ok (bf_loop bf1 bf2) [].
+    = Parse.ok (bf_loop bf1 bf2) [].
 Proof.
 Admitted.
 
 Lemma bf_print_parse_chars_inv (bf: BF):
-  parse_bf_state (chars_of_bf bf) = parse_ok bf [].
+  parse_bf_state (chars_of_bf bf) = Parse.ok bf [].
 Proof.
   induction bf; auto;
     rewrite chars_of_bf_equation, parse_bf_state_equation;
@@ -147,18 +136,10 @@ Proof.
   now apply (bf_print_parse_loop _ _ bf1 bf2).
 Qed.
 
-Lemma chars_of_string_of_chars_inv (l: list ascii):
-  chars_of_string (string_of_chars l) = l.
-Proof.
-  induction l; auto.
-  rewrite string_of_chars_equation, chars_of_string_equation.
-  now rewrite IHl.
-Qed.
-
 (* Removes the parser from the trusted computing base *)
 Theorem bf_print_parse_inv (bf: BF): parse_bf (print_bf bf) = Some bf.
 Proof.
-  unfold parse_bf, print_bf; rewrite chars_of_string_of_chars_inv.
+  unfold parse_bf, print_bf; rewrite Parse.chars_of_string_of_chars_inv.
   now rewrite bf_print_parse_chars_inv.
 Qed.
 
