@@ -298,9 +298,49 @@ Function lambda_step (e: Lambda): (option Lambda * option nat) :=
     end
   end.
 
+(* (* non-CBV semantics *) *)
+(* Function lambda_step (e: Lambda): (option Lambda * option nat) := *)
+(*   match e with *)
+(*   | l_var _ => (None, None) *)
+(*   | l_lam e' => *)
+(*     match lambda_step e' with *)
+(*     | (Some e'', n) => (Some (l_lam e''), n) *)
+(*     | (None, _) => (None, None) *)
+(*     end *)
+(*   | l_out e' => *)
+(*     match lambda_step e' with *)
+(*     | (Some e'', n) => (Some (l_out e''), n) *)
+(*     | (None, None) => (Some e', nat_of_lambda e') *)
+(*     | (None, _) => (None, None) *)
+(*     end *)
+(*   | l_app e1 e2 => *)
+(*     match lambda_step e1 with *)
+(*     | (Some e1', n) => (Some (l_app e1' e2), n) *)
+(*     | (None, _) => *)
+(*       match lambda_step e2 with *)
+(*       | (Some e2', n) => (Some (l_app e1 e2'), n) *)
+(*       | (None, _) => *)
+(*         match e1 with *)
+(*         | l_lam e1' => (Some (lambda_replace e1' e2 0), None) *)
+(*         | _ => (None, None) *)
+(*         end *)
+(*       end *)
+(*     end *)
+(*   end. *)
+
 Inductive LambdaState :=
 | lambda_state (output: list nat) (l: Lambda).
 
+(* DEBUGGING! *)
+Function lambda_steps (l: Lambda) (fuel: nat): (Lambda * nat) :=
+  match fuel with
+  | 0 => (l, fuel)
+  | S f =>
+    match lambda_step l with
+    | (Some l', _) => lambda_steps l' f
+    | _ => (l, fuel)
+    end
+  end.
 
 (* TODO: test me *)
 Function lambda_run (state: LambdaState) (fuel: nat): option (list nat) :=
@@ -333,20 +373,23 @@ Definition l_false := parse_def "\x.\y.y".
 Definition l_empty := parse_def "\f.f (\x.\y.\x) (\x.x)".
 Definition l_cons := parse_def "\a.\l.\f.f (\x.\y.y) (\f.f a l)".
 Definition l_isempty := parse_def "\l.l (\x.\y.x)".
-Definition l_head := parse_def "\l.l (\x.\y.y) (\x.\y.y)".
+Definition l_head := parse_def "\l.l (\x.\y.y) (\x.\y.x)".
 Definition l_tail := parse_def "\l.l (\x.\y.y) (\x.\y.y)".
 
-Function lambda_of_nat (n: nat): Lambda :=
+Function lambda_unfold_nat (n: nat): Lambda :=
   match n with
-  | 0 => l_zero
-  | S n' => l_app l_succ (lambda_of_nat n')
+  | 0 => l_var 0
+  | S n' => l_app (l_var 1) (lambda_unfold_nat n')
   end.
+
+Definition lambda_of_nat (n: nat): Lambda :=
+  l_lam (l_lam (lambda_unfold_nat n)).
 
 (* TODO: Reduce before returning *)
 Function lambda_of_nats (ns: list nat): Lambda :=
   match ns with
   | [] => l_empty
-  | hd :: tl => l_app (l_app l_cons (lambda_of_nat hd)) (lambda_of_nats tl)
+  | hd :: tl => l_lam (l_app (l_app (l_var 0) (l_lam (l_lam (l_var 0)))) (l_lam (l_app (l_app (l_var 0) (lambda_of_nat hd)) (lambda_of_nats tl))))
   end.
 
 (* The important interpreter as far as the spec is concerned *)
@@ -356,6 +399,10 @@ Function interpret_lambda (prog: string) (input: list nat) (f: nat):
   | None => None
   | Some l => lambda_run (lambda_state [] (l_app l (lambda_of_nats input))) f
   end.
+
+
+Eval compute in lambda_run (lambda_state [] (l_app (parse_def "\x.^(x (\x.\y.y) (\x.\y.x))") (lambda_of_nats [72]))) 20.
+
 
 Function nats_of_string (str: string): list nat :=
   match str with
@@ -375,5 +422,131 @@ Function interpret_lambda_readable (prog: string) (input: string) (f: nat):
   | None => EmptyString
   | Some ns => string_of_nats ns
   end.
+
+Eval compute in parse_named_lambda "\input.((\head. ^ (head input)) \l.(\x.\y.y) (\x.\y.x))".
+
+Eval compute in interpret_lambda "\input.((\head. ^ (head input)) (\l.l (\x.\y.y) (\x.\y.x)))" [72] 100.
+
+Eval compute in interpret_lambda_readable "\input.((\head. ^ (head input)) (\l.l (\x.\y.y) (\x.\y.x)))" "!" 100.
+
+Definition THETA := "((\x.\y.(y (\z.x x y z))) (\x.\y.(y (\z.x x y z))))"%string.
+Definition ISEMPTY := "(\l.l (\x.\y.x))"%string.
+Definition HEAD := "(\l.l (\x.\y.y) (\x.\y.x))"%string.
+Definition TAIL := "(\l.l (\x.\y.y) (\x.\y.y))"%string.
+
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  0.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  1.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  2.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  3.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  4.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  5.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  6.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  7.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  8.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  9.
+Eval compute in lambda_steps
+                  (l_app (parse_def ("\input." ++
+                                        THETA ++
+                                        "(\f.\l.("++ISEMPTY++" l)" ++
+                                        "(\x.x)" ++
+                                        "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+                                        "input"))
+                         (lambda_of_nats [0;1]))
+                  10.
+
+
+Eval compute in
+    interpret_lambda_readable
+      ("\input." ++
+         THETA ++
+         "(\f.\l.("++ISEMPTY++" l)" ++
+                "(\x.x)" ++
+                "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+         "input")
+      "Hello, world!" 20000.
+
+
+
+Eval compute in interpret_lambda_readable "\input.(\f.\g.(g (\h. f f g h))) (\f.\g.(g (\h. f f g h))) (\f.\l.(l (\x.\y.x)) (\x.x) ((\_.f (l \x.\y.y) (\x.\y.y)) ^ (l (\x.\y.y) (\x.\y.x)))) input" "He" 30000.
 
 (* TODO: Hello world *)
