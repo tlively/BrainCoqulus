@@ -20,6 +20,17 @@ Module Lambda.
   | lam : Lambda -> Lambda
   | app : Lambda -> Lambda -> Lambda.
 
+  (* For debugging lambda programs *)
+  Function print_lambda (l: Lambda): string :=
+    match l with
+    | var n =>
+      (String (ascii_of_nat (n + (nat_of_ascii "0"%char))) EmptyString)
+    | out l' => "^("%string ++ (print_lambda l') ++ ")"%string
+    | lam l' => "(\."%string ++ (print_lambda l') ++ ")"%string
+    | app l1 l2 => "("%string ++ (print_lambda l1) ++ " "%string
+                      ++ (print_lambda l2) ++ ")"%string
+    end.
+
   Section LambdaParsing.
 
     Local Inductive LambdaTree : Set :=
@@ -103,13 +114,13 @@ Module Lambda.
       | lam_lam (lam_id s (lam_dot t')) =>
         match named_lambda_of_tree [] t' with
         | None => None
-        | Some e => Some (nl_lam s e)
+        | Some e => app_of_lambda_list (rev ((nl_lam s e) :: acc))
         end
       | lam_lam _ | lam_dot _ => None
       | lam_out t' =>
         match named_lambda_of_tree [] t' with
         | None => None
-        | Some e => Some (nl_out e)
+        | Some e => app_of_lambda_list (rev ((nl_out e) :: acc))
         end
       | lam_id s t' => named_lambda_of_tree (nl_var s :: acc) t'
       | lam_paren inner t' =>
@@ -147,6 +158,12 @@ Module Lambda.
       parse_named_lambda "\x.^x" = Some (nl_lam "x" (nl_out (nl_var "x"))).
     auto. Qed.
 
+    Example named_out_app:
+      parse_named_lambda "\x.(\y.y) ^x" =
+      Some (nl_lam "x" (nl_app (nl_lam "y" (nl_var "y"))
+                               (nl_out (nl_var "x")))).
+    auto. Qed.
+
     Example named_Y:
       parse_named_lambda "\f.(\x.f (x x)) (\x.f (x x))" =
       let fn_app := nl_app (nl_var "f") (nl_app (nl_var "x") (nl_var "x")) in
@@ -159,11 +176,15 @@ Module Lambda.
 
     Example named_apps:
       parse_named_lambda "x y z w" =
-      Some (nl_app (
-                nl_app (
-                    nl_app (nl_var "x") (nl_var "y")
-                  ) (nl_var "z")
-              ) (nl_var "w")).
+      Some (nl_app (nl_app (nl_app (nl_var "x") (nl_var "y"))
+                           (nl_var "z"))
+                   (nl_var "w")).
+    auto. Qed.
+
+    Example named_inner_app:
+      parse_named_lambda "\x.(\y.y) \z.z" =
+      Some (nl_lam "x" (nl_app (nl_lam "y" (nl_var "y"))
+                               (nl_lam "z" (nl_var "z")))).
     auto. Qed.
 
     Example named_bad_lambdas: parse_named_lambda "\\x.x" = None.
@@ -476,15 +497,10 @@ Module Lambda.
   Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 2.
   Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 3.
 
-
-
-  Lemma theta_correct (g: LambdaNorm):
-    exists f,
-      lambda_steps (l_state [] (app l_theta (get_lam l_id))) f =
-      (l_state [] (app (app (get_lam l_id) l_theta) (get_lam l_id)), 0).
-  Proof.
-    exists 10.
-    simpl.
+  Eval compute in lambda_steps (l_state [] (app (app l_theta (get_lam l_id))
+                                                (get_lam l_id))) 0.
+  Eval compute in lambda_steps (l_state [] (app (app l_theta (get_lam l_id))
+                                                (get_lam l_id))) 7.
 
 
   Function lambda_unfold_nat (n: nat): Lambda :=
@@ -541,24 +557,18 @@ Module Lambda.
     | Some ns => string_of_nats ns
     end.
 
-  Eval compute in interpret_lambda "\input.((\head. ^ (head input)) (\l.l (\x.\y.y) (\x.\y.x)))" [72] 100.
-
-  Eval compute in interpret_lambda_readable "\input.((\head. ^ (head input)) (\l.l (\x.\y.y) (\x.\y.x)))" "!" 100.
+  Definition echo_prog: string :=
+    "\input." ++
+              THETA ++
+              "(\f.\l.("++ISEMPTY++" l)" ++
+                     "(\x.x)" ++
+                     "((\j.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
+              "input".
 
   Eval compute in
-      lambda_steps
-        (l_state [] (app (parse_def ("\input." ++
-                                     THETA ++
-                                     "(\f.\l.("++ISEMPTY++" l)" ++
-                                     "(\x.x)" ++
-                                     "((\_.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
-                                     "input"))
-                         (lambda_of_nats [1;2;3]))) 16.
+      lambda_steps (l_state [] (app (parse_def (echo_prog))
+                                    (lambda_of_nats [3;4]))) 9000.
 
-
-
-
-  Eval compute in interpret_lambda_readable "\input.(\f.\g.(g (\h. f f g h))) (\f.\g.(g (\h. f f g h))) (\f.\l.(l (\x.\y.x)) (\x.x) ((\_.f (l \x.\y.y) (\x.\y.y)) ^ (l (\x.\y.y) (\x.\y.x)))) input" "He" 30000.
 
   (* TODO: Hello world *)
 
