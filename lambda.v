@@ -301,7 +301,7 @@ Module Lambda.
   Function lambda_step (e: Lambda): option (Lambda * option nat) :=
     match e with
     | var _ => None
-    | lam e' => None
+    | lam _ => None
     | out e' =>
       match lambda_step e' with
       | Some (e'', n) => Some (out e'', n)
@@ -372,8 +372,7 @@ Module Lambda.
   Definition ISEMPTY := "(\l.l (\x.\y.x))"%string.
   Definition HEAD := "(\l.l (\x.\y.y) (\x.\y.x))"%string.
   Definition TAIL := "(\l.l (\x.\y.y) (\x.\y.y))"%string.
-  Definition THETA :=
-    "((\x.\y.(y (\z.x x y z))) (\x.\y.(y (\z.x x y z))))"%string.
+  Definition Z := "(\f.(\x.f (\y. x x y))(\x.f (\y. x x y)))"%string.
 
   Definition l_zero: LambdaNorm.
     refine (norm (parse_def ZERO) _ _); auto.
@@ -411,7 +410,9 @@ Module Lambda.
     refine (norm (parse_def TAIL) _ _); auto.
   Defined.
 
-  Definition l_theta := parse_def THETA.
+  Definition l_z: LambdaNorm.
+    refine (norm (parse_def Z) _ _); auto.
+  Defined.
 
   Lemma isempty_correct_emp:
     exists f,
@@ -455,8 +456,7 @@ Module Lambda.
   Proof.
     exists 10.
     destruct hd, tl.
-    unfold lambda_run.
-    simpl.
+    unfold lambda_run; simpl.
     rewrite term.
     unfold HEAD, CONS; simpl.
     rewrite term0; simpl.
@@ -479,8 +479,7 @@ Module Lambda.
   Proof.
     exists 10.
     destruct hd, tl.
-    unfold lambda_run.
-    simpl.
+    unfold lambda_run; simpl.
     rewrite term.
     unfold HEAD, CONS; simpl.
     rewrite term0; simpl.
@@ -490,18 +489,6 @@ Module Lambda.
     simpl.
     now repeat rewrite term0.
   Qed.
-
-  Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 50.
-  Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 0.
-  Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 1.
-  Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 2.
-  Eval compute in lambda_steps (l_state [] (app l_theta (get_lam l_id))) 3.
-
-  Eval compute in lambda_steps (l_state [] (app (app l_theta (get_lam l_id))
-                                                (get_lam l_id))) 0.
-  Eval compute in lambda_steps (l_state [] (app (app l_theta (get_lam l_id))
-                                                (get_lam l_id))) 7.
-
 
   Function lambda_unfold_nat (n: nat): Lambda :=
     match n with
@@ -533,11 +520,6 @@ Module Lambda.
       end
     end.
 
-  Eval compute in
-      let prog := parse_def ("\x.(\y.(\x.x)) ^("++HEAD++"("++TAIL++" x))") in
-      lambda_run (l_state [] (app prog (lambda_of_nats [72;60]))) 20.
-
-
   Function nats_of_string (str: string): list nat :=
     match str with
     | EmptyString => []
@@ -557,19 +539,16 @@ Module Lambda.
     | Some ns => string_of_nats ns
     end.
 
-  Definition echo_prog: string :=
-    "\input." ++
-              THETA ++
-              "(\f.\l.("++ISEMPTY++" l)" ++
-                     "(\x.x)" ++
-                     "((\j.f ("++TAIL++"l)) ^("++HEAD++ "l)))" ++
-              "input".
+  Definition lambda_echo: string :=
+    "\input."++Z++" (\f.\l.("++ISEMPTY++" l)"++
+                          "(\_.\x.x)"++
+                          "(\_.(\_.f ("++TAIL++" l)) ^("++HEAD++" l))"++
+                          "(\x.x))"++
+                    "input".
 
-  Eval compute in
-      lambda_steps (l_state [] (app (parse_def (echo_prog))
-                                    (lambda_of_nats [3;4]))) 9000.
-
-
-  (* TODO: Hello world *)
+  Example lambda_hello:
+    interpret_lambda_readable lambda_echo "Hello, world!" 364 =
+    "Hello, world!"%string.
+  auto. Qed.
 
 End Lambda.
