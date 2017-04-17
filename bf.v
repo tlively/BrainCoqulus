@@ -317,5 +317,10 @@ Fixpoint bfn_to_bf (bfn: BFN): BF :=
   | bfn_loop bfn1 bfn2 => bf_loop (bfn_to_bf bfn1) (bfn_to_bf bfn2)
   end.
 
+  Example parse_left_bfn:
+    parse_bf "<<<<+++++++" =
+    Some (bfn_to_bf (bfn_left 4 (bfn_inc 7 bfn_end))).
+  auto. Qed.
+
 End BFN.
 
