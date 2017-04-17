@@ -549,6 +549,8 @@ Module Lambda.
   Example lambda_hello:
     interpret_lambda_readable lambda_echo "Hello, world!" 364 =
     "Hello, world!"%string.
-  auto. Qed.
+  Proof. auto. Qed.
+
+  
 
 End Lambda.

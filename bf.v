@@ -117,6 +117,12 @@ Section BFParsing.
 
 End BFParsing.
 
+Lemma bf_helper (bf1 bf1': BF):
+  parse_bf_state (chars_of_bf bf1) = Parse.ok bf1' [] ->
+  bf1 = bf1'.
+Proof.
+Admitted.
+
 Lemma bf_print_parse_loop (bf1 bf2: BF):
   forall bf1' bf2',
     parse_bf_state (chars_of_bf bf1) = Parse.ok bf1' [] ->
@@ -274,4 +280,42 @@ Example hello_world_bf:
   interpret_bf_readable "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.
                         +++++++..+++.>++.<<+++++++++++++++.>.+++.------.
                         --------.>+. newline in next cell" "" 401 =
-  "Hello World!"%string. auto.
+  "Hello World!"%string. Proof. auto. Qed.
+
+
+
+Section BFN.
+
+(* Layer 1 above BF: BFN Program Type. Repeat each command N times *)
+Inductive BFN : Set :=
+| bfn_end : BFN
+| bfn_right : nat -> BFN -> BFN (* > *)
+| bfn_left : nat -> BFN -> BFN  (* < *)
+| bfn_inc : nat -> BFN -> BFN   (* + *)
+| bfn_dec : nat -> BFN -> BFN   (* - *)
+| bfn_out : nat -> BFN -> BFN   (* . *)
+| bfn_in : nat -> BFN -> BFN    (* , *)
+| bfn_loop : BFN -> BFN -> BFN.  (* [...] *)
+
+
+Fixpoint repeat (fn : BF -> BF) (n : nat) (bf: BF) : BF :=
+  match n with
+  | 0 => bf_end  (* should probably not be used *)
+  | 1 => fn bf
+  | S m => fn (repeat fn m bf)
+  end.
+
+Fixpoint bfn_to_bf (bfn: BFN): BF :=
+  match bfn with
+  | bfn_end => bf_end
+  | bfn_right n bfn' => repeat bf_right n (bfn_to_bf bfn')
+  | bfn_left n bfn' => repeat bf_left n (bfn_to_bf bfn')
+  | bfn_inc n bfn' => repeat bf_inc n (bfn_to_bf bfn')
+  | bfn_dec n bfn' => repeat bf_dec n (bfn_to_bf bfn')
+  | bfn_out n bfn' => repeat bf_out n (bfn_to_bf bfn')
+  | bfn_in n bfn' => repeat bf_in n (bfn_to_bf bfn')
+  | bfn_loop bfn1 bfn2 => bf_loop (bfn_to_bf bfn1) (bfn_to_bf bfn2)
+  end.
+
+End BFN.
+
