@@ -17,7 +17,7 @@ Print BFTape.
 Module BF.
 
   (* BF Program Type *)
-  Inductive BF : Set :=
+  Inductive BF : Type :=
   | bf_end : BF
   | bf_right : BF -> BF (* > *)
   | bf_left : BF -> BF  (* < *)
@@ -158,54 +158,42 @@ Module BF.
   (* `bf' is the current state of the program, while `resets' is the
      stack of programs to reset to at the end of a loop *)
   (* TODO: Generalize to all tape languages *)
-  Inductive BFState : Type :=
-    bf_state (bf: BF)
-             (resets: list BF)
-             (ptr: nat)
-             (tape: BFTape.Tape)
-             (input: list nat)
-             (output: list nat).
 
-  Print BFTape.
-  Function bf_state_init (bf: BF) (input: list nat): BFState :=
-    bf_state bf [] 0 BFTape.empty input [].
+  Definition BFState := @BFTape.ExecState BF.
+  Definition state := @BFTape.state BF.
 
-  Function bf_state_output (state: BFState): list nat :=
-    match state with bf_state _ _ _ _ _ output => output end.
-
-  Function bf_step (state: BFState): option BFState :=
-    match state with
-    | bf_state bf resets ptr tape input output =>
+  Function bf_step (s: BFState): option BFState :=
+    match s with
+    | BFTape.state bf resets ptr tape input output =>
       match bf with
       | bf_end =>
         match resets with
         | [] => None
         | bf' :: resets' =>
-          Some (bf_state bf' resets' ptr tape input output)
+          Some (state bf' resets' ptr tape input output)
         end
       | bf_right bf' =>
-        Some (bf_state bf' resets (S ptr) tape input output)
+        Some (state bf' resets (S ptr) tape input output)
       | bf_left bf' =>
-        Some (bf_state bf' resets (pred ptr) tape input output)
+        Some (state bf' resets (pred ptr) tape input output)
       | bf_inc bf' =>
-        Some (bf_state bf' resets ptr (BFTape.inc tape ptr) input output)
+        Some (state bf' resets ptr (BFTape.inc tape ptr) input output)
       | bf_dec bf' =>
-        Some (bf_state bf' resets ptr (BFTape.dec tape ptr) input output)
+        Some (state bf' resets ptr (BFTape.dec tape ptr) input output)
       | bf_out bf' =>
-        Some (bf_state bf' resets ptr tape input
-                       (output ++ [BFTape.get tape ptr]))
+        Some (state bf' resets ptr tape input (output ++ [BFTape.get tape ptr]))
       | bf_in bf' =>
         match input with
         | [] =>
-          Some (bf_state bf' resets ptr (BFTape.put tape ptr 0) input output)
+          Some (state bf' resets ptr (BFTape.put tape ptr 0) input output)
         | x :: input' =>
-          Some (bf_state bf' resets ptr (BFTape.put tape ptr x) input' output)
+          Some (state bf' resets ptr (BFTape.put tape ptr x) input' output)
         end
       | bf_loop inner_bf bf' =>
         if (BFTape.get tape ptr) =? 0 then
-          Some (bf_state bf' resets ptr tape input output)
+          Some (state bf' resets ptr tape input output)
         else
-          Some (bf_state inner_bf (bf :: resets) ptr tape input output)
+          Some (state inner_bf (bf :: resets) ptr tape input output)
       end
     end.
 
@@ -215,7 +203,7 @@ Module BF.
     | 0 => None
     | S f =>
       match bf_step state with
-      | None => Some (bf_state_output state)
+      | None => Some (BFTape.exec_output state)
       | Some state' => bf_run state' f
       end
     end.
@@ -243,7 +231,7 @@ Module BF.
     option (list nat) :=
     match parse_bf prog with
     | None => None
-    | Some bf => bf_run (bf_state_init bf input) f
+    | Some bf => bf_run (BFTape.exec_init bf input) f
     end.
 
   Function interpret_bf_readable (prog: string) (input: string) (f:nat):

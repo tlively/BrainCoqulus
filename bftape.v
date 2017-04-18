@@ -1,5 +1,6 @@
 Require FMapList.
 Require Import OrderedType OrderedTypeEx.
+Import ListNotations.
 
 Module BFTape.
 
@@ -23,5 +24,20 @@ Module BFTape.
 
   Definition dec (tape: Tape) (ptr: nat): Tape :=
     put tape ptr (pred (get tape ptr)).
+
+  (* Tape language execution state *)
+  Inductive ExecState {A: Type} : Type :=
+    state (ast: A)
+          (resets: list A)
+          (ptr: nat)
+          (tape: Tape)
+          (input: list nat)
+          (output: list nat).
+
+  Function exec_init {A: Type} (bf: A) (input: list nat): ExecState :=
+    state bf [] 0 BFTape.empty input [].
+
+  Function exec_output {A: Type } (state: @ExecState A): list nat :=
+    match state with state _ _ _ _ _ output => output end.
 
 End BFTape.
