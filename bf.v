@@ -155,10 +155,6 @@ Module BF.
   Qed.
 
   (* BF Interpreter *)
-  (* `bf' is the current state of the program, while `resets' is the
-     stack of programs to reset to at the end of a loop *)
-  (* TODO: Generalize to all tape languages *)
-
   Definition BFState := @BFTape.ExecState BF.
   Definition state := @BFTape.state BF.
 
@@ -197,22 +193,9 @@ Module BF.
       end
     end.
 
-  (* TODO: Use N as fuel with {measure N.to_nat fuel} *)
-  Function bf_run (state: BFState) (fuel: nat): option (list nat) :=
-    match fuel with
-    | 0 => None
-    | S f =>
-      match bf_step state with
-      | None => Some (BFTape.exec_output state)
-      | Some state' => bf_run state' f
-      end
-    end.
-
-  Function opt_list_len {A: Type} (l: option (list A)): nat :=
-    match l with
-    | Some l => List.length l
-    | None => 0
-    end.
+  (* Key function for correctness property *)
+  Definition interpret_bf (prog: BF) (input: list nat) (fuel: nat):
+    option (list nat) := BFTape.interpret bf_step prog input fuel.
 
   Function string_of_nats (out: list nat): string :=
     match out with
@@ -226,19 +209,15 @@ Module BF.
     | String a str' => nat_of_ascii a :: (nats_of_string str')
     end.
 
-  (* The important interpreter as far as the spec is concerned *)
-  Function interpret_bf (prog: string) (input: list nat) (f: nat):
-    option (list nat) :=
-    match parse_bf prog with
-    | None => None
-    | Some bf => bf_run (BFTape.exec_init bf input) f
-    end.
-
-  Function interpret_bf_readable (prog: string) (input: string) (f:nat):
+  Function interpret_bf_readable (prog: string) (input: string) (f: nat):
     string :=
-    match interpret_bf prog (nats_of_string input) f with
+    match parse_bf prog with
     | None => EmptyString
-    | Some output => string_of_nats output
+    | Some bf =>
+      match interpret_bf  bf (nats_of_string input) f with
+      | None => EmptyString
+      | Some output => string_of_nats output
+      end
     end.
 
   Example hello_world_bf:
