@@ -22,21 +22,21 @@ Module BFN.
     | S m => fn (repeat_com fn m bf)
     end.
 
-  Fixpoint bfn_to_bf (bfn: BFN): BF :=
+  Fixpoint bf_of_bfn (bfn: BFN): BF :=
     match bfn with
     | bfn_end => bf_end
-    | bfn_right n bfn' => repeat_com bf_right n (bfn_to_bf bfn')
-    | bfn_left n bfn' => repeat_com bf_left n (bfn_to_bf bfn')
-    | bfn_inc n bfn' => repeat_com bf_inc n (bfn_to_bf bfn')
-    | bfn_dec n bfn' => repeat_com bf_dec n (bfn_to_bf bfn')
-    | bfn_out n bfn' => repeat_com bf_out n (bfn_to_bf bfn')
-    | bfn_in n bfn' => repeat_com bf_in n (bfn_to_bf bfn')
-    | bfn_loop bfn1 bfn2 => bf_loop (bfn_to_bf bfn1) (bfn_to_bf bfn2)
+    | bfn_right n bfn' => repeat_com bf_right n (bf_of_bfn bfn')
+    | bfn_left n bfn' => repeat_com bf_left n (bf_of_bfn bfn')
+    | bfn_inc n bfn' => repeat_com bf_inc n (bf_of_bfn bfn')
+    | bfn_dec n bfn' => repeat_com bf_dec n (bf_of_bfn bfn')
+    | bfn_out n bfn' => repeat_com bf_out n (bf_of_bfn bfn')
+    | bfn_in n bfn' => repeat_com bf_in n (bf_of_bfn bfn')
+    | bfn_loop bfn1 bfn2 => bf_loop (bf_of_bfn bfn1) (bf_of_bfn bfn2)
     end.
 
   Example parse_left_bfn:
     parse_bf "<<<<+++++++" =
-    Some (bfn_to_bf (bfn_left 4 (bfn_inc 7 bfn_end))).
+    Some (bf_of_bfn (bfn_left 4 (bfn_inc 7 bfn_end))).
   auto. Qed.
 
 End BFN.

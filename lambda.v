@@ -551,6 +551,4 @@ Module Lambda.
     "Hello, world!"%string.
   Proof. auto. Qed.
 
-  
-
 End Lambda.
