@@ -110,6 +110,19 @@ Module BFN.
       (exists fuel, interpret_bfn bfn input fuel = Some output) ->
       (exists fuel, interpret_bf (bf_of_bfn bfn) input fuel = Some output).
   Proof.
+    induction bfn; intros.
+    {
+      destruct H, x; compute in H; try discriminate.
+      replace output with (@nil nat) in * by congruence; exists 1; auto.
+    }
+    1-6: induction n;
+      [ rewrite bf_of_bfn_equation;
+        apply IHbfn; clear IHbfn;
+        destruct H, x; [ compute in H; try discriminate | ];
+        rewrite <- H; clear H;
+        exists x | ].
+    - unfold interpret_bfn, BFTape.interpret.
+      unfold BFTape.run.
 
     Restart.
     intros.
