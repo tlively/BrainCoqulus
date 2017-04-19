@@ -66,25 +66,38 @@ Module BFN.
   Definition interpret_bfn (prog: BFN) (input: list nat) (fuel: nat):
     option (list nat) := BFTape.interpret bfn_step prog input fuel.
 
-  (* Translation BFN -> BF *)
-  Function repeat_com (fn : BF -> BF) (n : nat) (bf: BF) : BF :=
-    match n with
-    | 0 => bf_end  (* should probably not be used *)
-    | 1 => fn bf
-    | S m => fn (repeat_com fn m bf)
+  Function bfn_weight (bfn: BFN): nat :=
+    match bfn with
+    | bfn_end => 0
+    | bfn_right n bfn'
+    | bfn_left n bfn'
+    | bfn_inc n bfn'
+    | bfn_dec n bfn'
+    | bfn_out n bfn'
+    | bfn_in n bfn' => (S n) + bfn_weight bfn'
+    | bfn_loop inner bfn' => S ((bfn_weight inner) + (bfn_weight bfn'))
     end.
 
-  Function bf_of_bfn (bfn: BFN): BF :=
+  Function bf_of_bfn (bfn: BFN) {measure bfn_weight bfn}: BF :=
     match bfn with
     | bfn_end => bf_end
-    | bfn_right n bfn' => repeat_com bf_right n (bf_of_bfn bfn')
-    | bfn_left n bfn' => repeat_com bf_left n (bf_of_bfn bfn')
-    | bfn_inc n bfn' => repeat_com bf_inc n (bf_of_bfn bfn')
-    | bfn_dec n bfn' => repeat_com bf_dec n (bf_of_bfn bfn')
-    | bfn_out n bfn' => repeat_com bf_out n (bf_of_bfn bfn')
-    | bfn_in n bfn' => repeat_com bf_in n (bf_of_bfn bfn')
-    | bfn_loop bfn1 bfn2 => bf_loop (bf_of_bfn bfn1) (bf_of_bfn bfn2)
+    | bfn_right 0 bfn'
+    | bfn_left 0 bfn'
+    | bfn_inc 0 bfn'
+    | bfn_dec 0 bfn'
+    | bfn_out 0 bfn'
+    | bfn_in 0 bfn' => bf_of_bfn bfn'
+    | bfn_right (S n) bfn' => bf_right (bf_of_bfn (bfn_right n bfn'))
+    | bfn_left (S n) bfn' => bf_left (bf_of_bfn (bfn_left n bfn'))
+    | bfn_inc (S n) bfn' => bf_inc (bf_of_bfn (bfn_inc n bfn'))
+    | bfn_dec (S n) bfn' => bf_dec (bf_of_bfn (bfn_dec n bfn'))
+    | bfn_out (S n) bfn' => bf_out (bf_of_bfn (bfn_out n bfn'))
+    | bfn_in (S n) bfn' => bf_in (bf_of_bfn (bfn_in n bfn'))
+    | bfn_loop inner bfn' => bf_loop (bf_of_bfn inner) (bf_of_bfn bfn')
     end.
+  Proof.
+    all: intros; auto; simpl; omega.
+  Defined.
 
   Example translate_left_bfn:
     parse_bf "<<<<+++++++" =
@@ -97,11 +110,17 @@ Module BFN.
       (exists fuel, interpret_bfn bfn input fuel = Some output) ->
       (exists fuel, interpret_bf (bf_of_bfn bfn) input fuel = Some output).
   Proof.
+
+    Restart.
     intros.
-    destruct H.
     functional induction (bf_of_bfn bfn).
-    - destruct x; compute in H; try discriminate.
+    - destruct H, x; compute in H; try discriminate.
+      replace output with (@nil nat) in * by congruence.
       exists 1; auto.
-  Admitted.
+    - apply IHb; clear IHb.
+      destruct H.
+      unfold interpret_bfn in H.
+      unfold BFTape.interpret in H.
+      unfold BFTape.run in H.
 
 End BFN.
