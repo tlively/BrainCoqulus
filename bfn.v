@@ -171,10 +171,12 @@ Module BFN.
     1: intros.
     1: destruct fuel; compute in H; try discriminate.
     1: replace output with acc by congruence; exists 1; auto.
-    1-6: intros; exists (n + fuel); revert acc tape ptr input output H.
     1-6: induction n; intros.
-    1-12: destruct fuel; [ compute in H; try discriminate | ].
-    1,3,5,7,9,11: rewrite bf_of_bfn_equation.
-    1-6: apply IHbfn with (fuel:=fuel). (* Problem here! *)
+    1-12: destruct fuel; [ simpl in H; try discriminate | ].
+    (* take care of case 1 *)
+    cbn in H; rewrite bf_of_bfn_equation.
+    generalize (IHbfn _ _ _ _ _ _ H); intros Hx.
+    destruct Hx as [fuel' Hx].
+    now exists fuel'.
 
 End BFN.
