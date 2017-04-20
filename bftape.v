@@ -1,3 +1,4 @@
+Require Import Arith.
 Require FMapList.
 Require Import OrderedType OrderedTypeEx.
 Import ListNotations.
@@ -17,7 +18,7 @@ Module BFTape.
     end.
 
   Definition put (tape: Tape) (ptr: nat) (x: nat): Tape :=
-    NatMap.add ptr x tape.
+    if x =? get tape ptr then tape else NatMap.add ptr x tape.
 
   Definition inc (tape: Tape) (ptr: nat): Tape :=
     put tape ptr (S (get tape ptr)).

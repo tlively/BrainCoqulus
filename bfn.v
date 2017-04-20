@@ -1,3 +1,4 @@
+Require Import Bool.BoolEq.
 Load bf.
 Import BF.
 
@@ -29,12 +30,12 @@ Module BFN.
           Some (state bfn' resets' ptr tape input output)
         end
       | bfn_right n bfn' =>
-        Some (state bfn' resets (ptr + n) tape input output)
+        Some (state bfn' resets (n + ptr) tape input output)
       | bfn_left n bfn' =>
         Some (state bfn' resets (ptr - n) tape input output)
       | bfn_inc n bfn' =>
         Some (state bfn' resets ptr
-                    (BFTape.put tape ptr ((BFTape.get tape ptr) + n))
+                    (BFTape.put tape ptr (n + (BFTape.get tape ptr)))
                     input output)
       | bfn_dec n bfn' =>
         Some (state bfn' resets ptr
@@ -111,29 +112,69 @@ Module BFN.
       (exists fuel, interpret_bf (bf_of_bfn bfn) input fuel = Some output).
   Proof.
     induction bfn; intros.
-    {
-      destruct H, x; compute in H; try discriminate.
-      replace output with (@nil nat) in * by congruence; exists 1; auto.
-    }
-    1-6: induction n;
-      [ rewrite bf_of_bfn_equation;
-        apply IHbfn; clear IHbfn;
-        destruct H, x; [ compute in H; try discriminate | ];
-        rewrite <- H; clear H;
-        exists x | ].
-    - unfold interpret_bfn, BFTape.interpret.
-      unfold BFTape.run.
+    destruct H, x; compute in H; try discriminate.
+    replace output with (@nil nat) in * by congruence; exists 1; auto.
+    1-6: induction n.
+    1,3,5,7,9,11: rewrite bf_of_bfn_equation; apply IHbfn; clear IHbfn.
+    1-6: destruct H, x; [ compute in H; discriminate | ].
+    1-6: rewrite <- H; clear H.
+    1-6: exists x.
+    1-6: unfold interpret_bfn, BFTape.interpret, BFTape.exec_init.
+    1-6: cbn; auto.
+    1-2: unfold state.
+    1-2: replace (BFTape.put BFTape.empty 0 0) with (BFTape.empty); auto.
+    1-2: admit.
+    (* H contradics premise of IHn *)
 
     Restart.
-    intros.
-    functional induction (bf_of_bfn bfn).
-    - destruct H, x; compute in H; try discriminate.
-      replace output with (@nil nat) in * by congruence.
-      exists 1; auto.
-    - apply IHb; clear IHb.
-      destruct H.
-      unfold interpret_bfn in H.
-      unfold BFTape.interpret in H.
-      unfold BFTape.run in H.
+    intro; functional induction (bf_of_bfn bfn); intros; destruct H.
+    destruct x; compute in H; try discriminate.
+    replace output with (@nil nat) by congruence; exists 1; auto.
+    1-6: apply IHb; clear IHb.
+    1-6: rewrite <- H; clear H.
+    1-6: destruct x; [ exists 0; auto | ].
+    1-6: exists x; unfold interpret_bfn, BFTape.interpret, BFTape.exec_init.
+    1-6: cbn; auto.
+    induction n.
+    destruct x; [ exists 0; auto | ].
+    cbn in H.
+    exists x.
+    destruct x; auto.
+    cbn.
+    (* Needed to revert more things *)
+
+    Restart.
+    intros; destruct H as [fuel].
+    revert input output fuel H.
+    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
+    remember 0 as ptr; clear Heqptr; revert ptr.
+    remember BFTape.empty as tape; clear Heqtape; revert tape.
+    remember (@nil nat) as acc; clear Heqacc; revert acc.
+    functional induction (bf_of_bfn bfn); intros. (* Try induction bfn *)
+    destruct fuel; compute in H; try discriminate.
+    replace output with acc by congruence; exists 1; auto.
+    1-6: destruct fuel; [ exists 0; auto | ].
+    1-6: apply IHb with (fuel:=fuel); clear IHb.
+    1-6: rewrite <- H; clear H.
+    1-6: cbn; try rewrite Nat.sub_0_r.
+    1-6: unfold BFTape.put; try rewrite <- beq_nat_refl; auto.
+    (* Zero cases finished, this proof strategy might work *)
+
+    Restart.
+    intros; destruct H as [fuel].
+    revert input output fuel H.
+    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
+    remember 0 as ptr; clear Heqptr; revert ptr.
+    remember BFTape.empty as tape; clear Heqtape; revert tape.
+    remember (@nil nat) as acc; clear Heqacc; revert acc.
+    induction bfn.
+    1: intros.
+    1: destruct fuel; compute in H; try discriminate.
+    1: replace output with acc by congruence; exists 1; auto.
+    1-6: intros; exists (n + fuel); revert acc tape ptr input output H.
+    1-6: induction n; intros.
+    1-12: destruct fuel; [ compute in H; try discriminate | ].
+    1,3,5,7,9,11: rewrite bf_of_bfn_equation.
+    1-6: apply IHbfn with (fuel:=fuel). (* Problem here! *)
 
 End BFN.
