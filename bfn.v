@@ -173,10 +173,20 @@ Module BFN.
     1: replace output with acc by congruence; exists 1; auto.
     1-6: induction n; intros.
     1-12: destruct fuel; [ simpl in H; try discriminate | ].
-    (* take care of case 1 *)
-    cbn in H; rewrite bf_of_bfn_equation.
-    generalize (IHbfn _ _ _ _ _ _ H); intros Hx.
-    destruct Hx as [fuel' Hx].
-    now exists fuel'.
+    1,3,5,7,9,11: cbn in H; rewrite bf_of_bfn_equation.
+    1-6: generalize (IHbfn _ _ _ _ _ _ H); intros Hx.
+    1-6: destruct Hx as [fuel' Hx].
+    1-6: try rewrite Nat.sub_0_r in Hx.
+    1-6: unfold BFTape.put in Hx; try rewrite <- beq_nat_refl in Hx.
+    1-6: exists fuel'; auto.
+
+    (* Do first inductive case *)
+    clear IHbfn.
+    exists (n + fuel).
+    destruct fuel; [ compute in H; discriminate | ].
+    replace (n + S fuel) with (S (n + fuel)) by omega.
+    rewrite bf_of_bfn_equation.
+    cbn.
+    apply IHn. (* But IHn has an exists! *)
 
 End BFN.
