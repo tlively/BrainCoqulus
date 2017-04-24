@@ -3,6 +3,8 @@ Require FMapList.
 Require Import OrderedType OrderedTypeEx.
 Import ListNotations.
 
+Load utils.
+
 Module BFTape.
 
   (* A BFTape is a map from [nat] indices to [nat] values *)
@@ -43,20 +45,8 @@ Module BFTape.
   Function exec_output {A: Type } (state: @ExecState A): list nat :=
     match state with state _ _ _ _ _ output => output end.
 
-  (* TODO: Use N as fuel with {measure N.to_nat fuel} *)
-  Function run {A: Type} (step: @ExecState A -> option (@ExecState A))
-           (state: @ExecState A) (fuel: nat): option (list nat) :=
-    match fuel with
-    | 0 => None
-    | S f =>
-      match step state with
-      | None => Some (exec_output state)
-      | Some state' => run step state' f
-      end
-    end.
-
   Definition interpret {A: Type} (step: @ExecState A -> option (@ExecState A))
            (prog: A) (input: list nat) (fuel: nat): option (list nat) :=
-    run step (exec_init prog input) fuel.
+    Utils.run step (exec_init prog input) exec_output fuel.
 
 End BFTape.
