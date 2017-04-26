@@ -156,40 +156,41 @@ Module BF.
 
   (* BF Interpreter *)
   Definition BFState := @BFTape.ExecState BF.
-  Definition state := @BFTape.state BF.
+  Definition running := @BFTape.running BF.
 
-  Function bf_step (s: BFState): option BFState :=
+  Function bf_step (s: BFState): BFState :=
     match s with
-    | BFTape.state bf resets ptr tape input output =>
+    | BFTape.halted _ => s
+    | BFTape.running bf resets ptr tape input output =>
       match bf with
       | bf_end =>
         match resets with
-        | [] => None
+        | [] => BFTape.halted output
         | bf' :: resets' =>
-          Some (state bf' resets' ptr tape input output)
+          BFTape.running bf' resets' ptr tape input output
         end
       | bf_right bf' =>
-        Some (state bf' resets (S ptr) tape input output)
+        running bf' resets (S ptr) tape input output
       | bf_left bf' =>
-        Some (state bf' resets (pred ptr) tape input output)
+        running bf' resets (pred ptr) tape input output
       | bf_inc bf' =>
-        Some (state bf' resets ptr (BFTape.inc tape ptr) input output)
+        running bf' resets ptr (BFTape.inc tape ptr) input output
       | bf_dec bf' =>
-        Some (state bf' resets ptr (BFTape.dec tape ptr) input output)
+        running bf' resets ptr (BFTape.dec tape ptr) input output
       | bf_out bf' =>
-        Some (state bf' resets ptr tape input (output ++ [BFTape.get tape ptr]))
+        running bf' resets ptr tape input (output ++ [BFTape.get tape ptr])
       | bf_in bf' =>
         match input with
         | [] =>
-          Some (state bf' resets ptr (BFTape.put tape ptr 0) input output)
+          running bf' resets ptr (BFTape.put tape ptr 0) input output
         | x :: input' =>
-          Some (state bf' resets ptr (BFTape.put tape ptr x) input' output)
+          running bf' resets ptr (BFTape.put tape ptr x) input' output
         end
       | bf_loop inner_bf bf' =>
         if (BFTape.get tape ptr) =? 0 then
-          Some (state bf' resets ptr tape input output)
+          running bf' resets ptr tape input output
         else
-          Some (state inner_bf (bf :: resets) ptr tape input output)
+          running inner_bf (bf :: resets) ptr tape input output
       end
     end.
 

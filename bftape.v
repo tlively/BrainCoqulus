@@ -32,21 +32,22 @@ Module BFTape.
      `ast' is the current state of the program, while `resets' is the
      stack of programs to reset to at the end of a loop *)
   Inductive ExecState {A: Type} : Type :=
-    state (ast: A)
-          (resets: list A)
-          (ptr: nat)
-          (tape: Tape)
-          (input: list nat)
-          (output: list nat).
+    | running (ast: A)
+              (resets: list A)
+              (ptr: nat)
+              (tape: Tape)
+              (input: list nat)
+              (output: list nat)
+    | halted (output: list nat).
 
   Function exec_init {A: Type} (prog: A) (input: list nat): ExecState :=
-    state prog [] 0 BFTape.empty input [].
+    running prog [] 0 BFTape.empty input [].
 
-  Function exec_output {A: Type } (state: @ExecState A): list nat :=
-    match state with state _ _ _ _ _ output => output end.
-
-  Definition interpret {A: Type} (step: @ExecState A -> option (@ExecState A))
-           (prog: A) (input: list nat) (fuel: nat): option (list nat) :=
-    Utils.run step (exec_init prog input) exec_output fuel.
+  Definition interpret {A: Type} (step: @ExecState A -> @ExecState A)
+             (prog: A) (input: list nat) (fuel: nat): option (list nat) :=
+    match Utils.run step (exec_init prog input) fuel with
+    | running _ _ _ _ _ _ => None
+    | halted output => Some output
+    end.
 
 End BFTape.

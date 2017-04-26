@@ -1,4 +1,5 @@
 Require Import Bool.BoolEq.
+Require Import Logic.FunctionalExtensionality.
 Load bf.
 Import BF.
 
@@ -17,7 +18,7 @@ Module BFN.
 
   (* BFN Semantics *)
   Definition BFNState := @BFTape.ExecState BFN.
-  Definition state := @BFTape.state BFN.
+  Definition running := @BFTape.running BFN.
 
   Function bfn_weight (bfn: BFN): nat :=
     match bfn with
@@ -32,50 +33,53 @@ Module BFN.
     end.
 
   Function bfn_state_weight (s: BFNState): nat :=
-    match s with BFTape.state bfn _ _ _ _ _ => bfn_weight bfn end.
-
-  Function bfn_step (s: BFNState) {measure bfn_state_weight s}:
-    option BFNState :=
     match s with
-    | BFTape.state bfn resets ptr tape input output =>
+    | BFTape.running bfn _ _ _ _ _ => bfn_weight bfn
+    | BFTape.halted _ => 0
+    end.
+
+  Function bfn_step (s: BFNState) {measure bfn_state_weight s}: BFNState :=
+    match s with
+    | BFTape.halted _ => s
+    | BFTape.running bfn resets ptr tape input output =>
       match bfn with
       | bfn_end =>
         match resets with
-        | [] => None
+        | [] => BFTape.halted output
         | bfn' :: resets' =>
-          Some (state bfn' resets' ptr tape input output)
+          running bfn' resets' ptr tape input output
         end
       | bfn_right 0 bfn'
       | bfn_left 0 bfn'
       | bfn_inc 0 bfn'
       | bfn_dec 0 bfn'
       | bfn_out 0 bfn'
-      | bfn_in 0 bfn' => bfn_step (state bfn' resets ptr tape input output)
+      | bfn_in 0 bfn' => bfn_step (running bfn' resets ptr tape input output)
       | bfn_right (S n) bfn' =>
-        Some (state (bfn_right n bfn') resets (S ptr) tape input output)
+        running (bfn_right n bfn') resets (S ptr) tape input output
       | bfn_left (S n) bfn' =>
-        Some (state (bfn_left n bfn') resets (pred ptr) tape input output)
+        running (bfn_left n bfn') resets (pred ptr) tape input output
       | bfn_inc (S n) bfn' =>
-        Some (state (bfn_inc n bfn') resets ptr (BFTape.inc tape ptr) input output)
+        running (bfn_inc n bfn') resets ptr (BFTape.inc tape ptr) input output
       | bfn_dec (S n) bfn' =>
-        Some (state (bfn_dec n bfn') resets ptr (BFTape.dec tape ptr) input output)
+        running (bfn_dec n bfn') resets ptr (BFTape.dec tape ptr) input output
       | bfn_out (S n) bfn' =>
-        Some (state (bfn_out n bfn') resets ptr tape input
-                    (output ++ [BFTape.get tape ptr]))
+        running (bfn_out n bfn') resets ptr tape input
+                    (output ++ [BFTape.get tape ptr])
       | bfn_in (S n) bfn' =>
         match input with
         | [] =>
-          Some (state (bfn_in n bfn') resets ptr (BFTape.put tape ptr 0)
-                      input output)
+          running (bfn_in n bfn') resets ptr (BFTape.put tape ptr 0)
+                      input output
         | x :: input' =>
-          Some (state (bfn_in n bfn') resets ptr (BFTape.put tape ptr x)
-                      input' output)
+          running (bfn_in n bfn') resets ptr (BFTape.put tape ptr x)
+                      input' output
         end
       | bfn_loop inner_bfn bfn' =>
         if (BFTape.get tape ptr) =? 0 then
-          Some (state bfn' resets ptr tape input output)
+          running bfn' resets ptr tape input output
         else
-          Some (state inner_bfn (bfn :: resets) ptr tape input output)
+          running inner_bfn (bfn :: resets) ptr tape input output
       end
     end.
   Proof.
@@ -112,168 +116,72 @@ Module BFN.
     Some (bf_of_bfn (bfn_left 4 (bfn_inc 7 bfn_end))).
   auto. Qed.
 
-  (* TODO: Prove bf_of_bfn_correct *)
+  Lemma bfn_replace_loops:
+    forall (bfn1 bfn2: BFN),
+      bf_of_bfn (bfn_loop bfn1 bfn2) =
+      bf_loop (bf_of_bfn bfn1) (bf_of_bfn bfn2).
+  Proof.
+  Admitted.
+
+  Function bf_state_of_bfn_state (state: BFNState): BFState :=
+    match state with
+    | BFTape.halted output => BFTape.halted output
+    | BFTape.running bfn resets ptr tape input output =>
+      BFTape.running (bf_of_bfn bfn) (map bf_of_bfn resets)
+                     ptr tape input output
+    end.
+
+  Lemma bf_of_bfn_sim_step:
+    forall (s: BFNState),
+      bf_step (bf_state_of_bfn_state s) = bf_state_of_bfn_state (bfn_step s).
+  Proof.
+    intros.
+    destruct s; unfold bf_state_of_bfn_state;
+      [ | rewrite bfn_step_equation; auto ].
+    induction ast.
+    destruct resets;
+      rewrite bfn_step_equation;
+      now unfold bf_state_of_bfn_state.
+    6: destruct input.
+    1-7: induction n;
+      rewrite bf_of_bfn_equation;
+      now rewrite bfn_step_equation.
+    rewrite bf_of_bfn_equation.
+    rewrite bfn_step_equation.
+    unfold bf_step.
+    destruct (BFTape.get tape ptr).
+    now replace (0 =? 0) with true by auto.
+    replace (S n =? 0) with false by auto; simpl.
+    now rewrite bfn_replace_loops.
+  Qed.
+
+  Lemma bf_of_bfn_sim:
+    forall (fuel: nat) (s: BFNState),
+      Utils.run bf_step (bf_state_of_bfn_state s) fuel =
+      bf_state_of_bfn_state (Utils.run bfn_step s fuel).
+  Proof.
+    induction fuel; auto.
+    simpl; intros.
+    rewrite <- IHfuel.
+    now rewrite bf_of_bfn_sim_step.
+  Qed.
+
   Lemma bf_of_bfn_correct:
     forall (bfn: BFN) (input output: list nat),
       (exists fuel, interpret_bfn bfn input fuel = Some output) ->
       (exists fuel, interpret_bf (bf_of_bfn bfn) input fuel = Some output).
   Proof.
-    intros; destruct H as [fuel].
-    exists fuel.
-    revert input output fuel H.
-    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    remember 0 as ptr; clear Heqptr; revert ptr.
-    remember BFTape.empty as tape; clear Heqtape; revert tape.
-    remember (@nil nat) as acc; clear Heqacc; revert acc.
-    induction bfn; intros.
-    all: destruct fuel; cbn in H; try discriminate.
-    rewrite bfn_step_equation in H.
-    rewrite <- H; now compute.
-    (* inductive cases *)
-    revert acc tape ptr input output fuel H.
-    1-6: induction n; intros;
-      [ rewrite bf_of_bfn_equation; apply IHbfn;
-        rewrite bfn_step_equation in H; auto | ].
-
-    (* inner inductive cases *)
-    rewrite bf_of_bfn_equation; simpl.
-    destruct fuel; rewrite bfn_step_equation in H; simpl in H; try discriminate.
-    apply IHn.
-    (* IHn is useless for some reason *)
-
-    Restart.
-    intros; destruct H as [fuel].
-    exists fuel.
-    revert input output fuel H.
-    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    remember 0 as ptr; clear Heqptr; revert ptr.
-    remember BFTape.empty as tape; clear Heqtape; revert tape.
-    remember (@nil nat) as acc; clear Heqacc; revert acc.
-    functional induction (bf_of_bfn bfn); intros.
-    all: destruct fuel; cbn in H; try discriminate.
-    rewrite bfn_step_equation in H.
-    rewrite <- H; now compute.
-    (* inductive cases *)
-    1-6: apply IHb; clear IHb.
-    1-6: simpl in *; now rewrite bfn_step_equation in H.
-    6: destruct input.
-    1-7: try (simpl; apply IHb; clear IHb; now rewrite bfn_step_equation in H).
-    (* loop case *)
-    simpl.
-    rewrite bfn_step_equation in H.
-    destruct (BFTape.get tape ptr); simpl in *.
-    - apply IHb0; clear IHb IHb0; auto.
-    -
-      (* Need information about reset stacks *)
-
-    Restart.
-    intros; destruct H as [fuel].
-    exists fuel.
-    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init in *.
+    intros.
+    destruct H as [fuel]; exists fuel.
     rewrite <- H; clear H.
-    clear output.
-    revert input fuel.
-    remember 0 as ptr; clear Heqptr; revert ptr.
-    remember BFTape.empty as tape; clear Heqtape; revert tape.
-    remember (@nil nat) as acc; clear Heqacc; revert acc.
-    remember (@nil BFN) as bfns; clear Heqbfns; revert bfns.
-    functional induction (bf_of_bfn bfn); intros.
-    all: destruct fuel; cbn in H; try discriminate.
-    rewrite bfn_step_equation in H.
-    rewrite <- H; now compute.
-    (* inductive cases *)
-    1-6: apply IHb; clear IHb.
-    1-6: simpl in *; now rewrite bfn_step_equation in H.
-    6: destruct input.
-    1-7: try (simpl; apply IHb; clear IHb; now rewrite bfn_step_equation in H).
-    (* loop case *)
-    simpl.
-    rewrite bfn_step_equation in H.
-    destruct (BFTape.get tape ptr); simpl in *.
-    - apply IHb0; clear IHb IHb0; auto.
-    - apply IHb.
-
-
-    Restart. (* Old step function *)
-    induction bfn; intros.
-    destruct H, x; compute in H; try discriminate.
-    replace output with (@nil nat) in * by congruence; exists 1; auto.
-    1-6: induction n.
-    1,3,5,7,9,11: rewrite bf_of_bfn_equation; apply IHbfn; clear IHbfn.
-    1-6: destruct H, x; [ compute in H; discriminate | ].
-    1-6: rewrite <- H; clear H.
-    1-6: exists x.
-    1-6: unfold interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    1-6: cbn; auto.
-    1-2: unfold state.
-    1-2: replace (BFTape.put BFTape.empty 0 0) with (BFTape.empty); auto.
-    1-2: admit.
-    (* H contradics premise of IHn *)
-
-    Restart.
-    intro; functional induction (bf_of_bfn bfn); intros; destruct H.
-    destruct x; compute in H; try discriminate.
-    replace output with (@nil nat) by congruence; exists 1; auto.
-    1-6: apply IHb; clear IHb.
-    1-6: rewrite <- H; clear H.
-    1-6: destruct x; [ exists 0; auto | ].
-    1-6: exists x; unfold interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    1-6: cbn; auto.
-    induction n.
-    destruct x; [ exists 0; auto | ].
-    cbn in H.
-    exists x.
-    destruct x; auto.
-    cbn.
-    (* Needed to revert more things *)
-
-    Restart.
-    intros; destruct H as [fuel].
-    revert input output fuel H.
-    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    remember 0 as ptr; clear Heqptr; revert ptr.
-    remember BFTape.empty as tape; clear Heqtape; revert tape.
-    remember (@nil nat) as acc; clear Heqacc; revert acc.
-    functional induction (bf_of_bfn bfn); intros. (* Try induction bfn *)
-    destruct fuel; compute in H; try discriminate.
-    replace output with acc by congruence; exists 1; auto.
-    1-6: destruct fuel; [ exists 0; auto | ].
-    1-6: apply IHb with (fuel:=fuel); clear IHb.
-    1-6: rewrite <- H; clear H.
-    1-6: cbn; try rewrite Nat.sub_0_r.
-    1-6: unfold BFTape.put; try rewrite <- beq_nat_refl; auto.
-    (* Zero cases finished, this proof strategy might work *)
-
-    Restart.
-    intros; destruct H as [fuel].
-    revert input output fuel H.
-    unfold interpret_bf, interpret_bfn, BFTape.interpret, BFTape.exec_init.
-    remember 0 as ptr; clear Heqptr; revert ptr.
-    remember BFTape.empty as tape; clear Heqtape; revert tape.
-    remember (@nil nat) as acc; clear Heqacc; revert acc.
-    induction bfn.
-    1: intros.
-    1: destruct fuel; compute in H; try discriminate.
-    1: replace output with acc by congruence; exists 1; auto.
-    1-6: induction n; intros.
-    1-12: destruct fuel; [ simpl in H; try discriminate | ].
-    1,3,5,7,9,11: cbn in H; rewrite bf_of_bfn_equation.
-    1-6: generalize (IHbfn _ _ _ _ _ _ H); intros Hx.
-    1-6: destruct Hx as [fuel' Hx].
-    1-6: try rewrite Nat.sub_0_r in Hx.
-    1-6: unfold BFTape.put in Hx; try rewrite <- beq_nat_refl in Hx.
-    1-6: exists fuel'; auto.
-
-    (* Do first inductive case *)
-    cbn in H.
-    apply IHbfn in H; clear IHbfn.
-
-    exists (n + fuel).
-    (* destruct fuel; [ compute in H; discriminate | ]. *)
-    (* replace (n + S fuel) with (S (n + fuel)) by omega. *)
-    (* rewrite bf_of_bfn_equation. *)
-    (* cbn. *)
-    (* apply IHn. (* But IHn has an exists! *) *)
+    unfold interpret_bf, interpret_bfn, BFTape.interpret.
+    replace (BFTape.exec_init (bf_of_bfn bfn) input) with
+    (bf_state_of_bfn_state (BFTape.exec_init bfn input)) by auto.
+    rewrite bf_of_bfn_sim.
+    remember (Utils.run bfn_step (BFTape.exec_init bfn input) fuel) as result.
+    (* Both instances should have been remembered! *)
+    destruct result;
+      now unfold bf_state_of_bfn_state.
   Admitted.
 
 End BFN.
