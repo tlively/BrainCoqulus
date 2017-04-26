@@ -13,4 +13,13 @@ Module Utils.
     | S f => run step (step state) f
     end.
 
+   (* Monads ftw! *)
+  Definition bind {A B : Type} (a: option A) (f : A -> option B) :=
+    match a with
+    | None => None
+    | Some a => f a
+    end.
+
 End Utils.
+
+Notation "a >>= f" := (Utils.bind a f) (at level 50, left associativity).

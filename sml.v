@@ -6,7 +6,7 @@ Import ListNotations.
 
 Load utils.
 
-Module StackMachine.
+Module SML.
 
   Inductive Item : Set :=
   | item_nat : nat -> Item
@@ -27,25 +27,19 @@ Module StackMachine.
   Definition Stack := list Item.
 
   Inductive SMState :=
-    state (ast: SMProgram)
+    | running (ast: SMProgram)
           (fn_table: list SMProgram)
           (stack: Stack)
-          (output: list nat).
+          (output: list nat)
+
+    | error (output: list nat)
+    | halted (output: list nat).
 
   Definition failsafe_tl {A: Type} (l: list A) :=
     match l with
     | [] => []
     | _ :: tl => tl
     end.
-
-  (* Monads ftw! *)
-  Definition bind {A B : Type} (a: option A) (f : A -> option B) :=
-    match a with
-    | None => None
-    | Some a => f a
-    end.
-
-  Notation "a >>= f" := (bind a f) (at level 50, left associativity).
 
   Definition tl_error {A} (l : list A) : option (list A) :=
     match l with
@@ -94,52 +88,65 @@ Module StackMachine.
   Proof.
   Admitted.
 
-  Function sm_step (s: SMState): option SMState :=
+  Definition sm_bind {A : Type} (a: option A) (f : A -> SMState) (output: list nat) :=
+    match a with
+    | None => error output
+    | Some a => f a
+    end.
+
+  Definition sm_step (s: SMState): SMState :=
     match s with
-    | state smp fn_table stack output =>
+    | halted _ => s
+    | error _ => s
+    | running smp fn_table stack output =>
       let state_from_stack (smp': SMProgram) (stack : Stack) :=
-        Some (state smp' fn_table stack output)
+        running smp' fn_table stack output
       in match smp with
-      | sm_end => None
+      | sm_end => halted output
       | push n smp' => state_from_stack smp' ((item_nat n) :: stack)
-      | pop smp'=> (tl_error stack) >>= (state_from_stack smp')
+      | pop smp'=> sm_bind (tl_error stack) (state_from_stack smp') output
       | get n smp' =>
-        let new_stack := (nth_error stack n) >>= (fun a => Some (a :: stack)) 
-        in new_stack >>= (state_from_stack smp')
-      | pack n smp' => (stack_pack n stack) >>= (state_from_stack smp')
-      | unpack smp' => (stack_unpack stack) >>= (state_from_stack smp')
+        let new_stack := (nth_error stack n) >>= (fun a => Some (a :: stack))
+        in sm_bind new_stack (state_from_stack smp') output
+      | pack n smp' => sm_bind (stack_pack n stack) (state_from_stack smp') output
+      | unpack smp' => sm_bind (stack_unpack stack) (state_from_stack smp') output
       | jump => match stack with
-        | (item_nat id) :: tl => (nth_error fn_table id) >>= (fun smp =>
-          Some (state smp fn_table tl output))
-        | _ => None
+        | (item_nat id) :: tl => sm_bind (nth_error fn_table id) 
+            (fun smp => running smp fn_table tl output) output
+        | _ => error output
         end
-      | out smp' => match stack with
+      | out smp' => let out_char := 
+        match stack with
         | (item_nat o) :: _ => Some o
         | _ => None
-        end
-        >>= (fun o => Some (state smp' fn_table stack (o :: output)))
+        end in 
+        sm_bind out_char (fun o => running smp' fn_table stack (o :: output)) output
       end
     end.
 
   (* TODO: Abstract the functions below along with the stuff in bftape.v *)
   Definition exec_output (state: SMState): list nat :=
-    match state with state _ _ _ output => output end.
-
-  Definition exec_init (fn_table: list SMProgram) : option SMState :=
-    match fn_table with
-    | smp :: _ => Some (state smp fn_table [] [])
-    | [] => None
+    match state with 
+    | running _ _ _ output => output 
+    | halted output => output
+    | error output => output    
     end.
 
-  Definition interpret (fn_table: list SMProgram) (fuel: nat): option (list nat) :=
-    (exec_init fn_table) >>= (fun state => Utils.run sm_step state exec_output fuel). 
+  Definition exec_init (fn_table: list SMProgram) : SMState :=
+    match fn_table with
+    | smp :: _ => running smp fn_table [] []
+    | [] => error []
+    end.
+
+  Definition interpret (fn_table: list SMProgram) (fuel: nat): list nat :=
+    exec_output (Utils.run sm_step (exec_init fn_table) fuel). 
 
   Example push_simple:
-    interpret [push 3 (out sm_end)] 20 = Some [3].
+    interpret [push 3 (out sm_end)] 20 = [3].
   Proof. auto. Qed.
 
   Example jump_simple:
-    interpret [push 1 (out jump); push 3 (out sm_end)] 20 = Some [3; 1].
+    interpret [push 1 (out jump); push 3 (out sm_end)] 20 = [3; 1].
   Proof. auto. Qed.
 
-End StackMachine.
+End SML.
