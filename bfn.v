@@ -121,7 +121,10 @@ Module BFN.
       bf_of_bfn (bfn_loop bfn1 bfn2) =
       bf_loop (bf_of_bfn bfn1) (bf_of_bfn bfn2).
   Proof.
-  Admitted.
+    intros.
+    rewrite bf_of_bfn_equation.
+    reflexivity.
+  Qed.
 
   Function bf_state_of_bfn_state (state: BFNState): BFState :=
     match state with
@@ -178,10 +181,11 @@ Module BFN.
     replace (BFTape.exec_init (bf_of_bfn bfn) input) with
     (bf_state_of_bfn_state (BFTape.exec_init bfn input)) by auto.
     rewrite bf_of_bfn_sim.
-    remember (Utils.run bfn_step (BFTape.exec_init bfn input) fuel) as result.
-    (* Both instances should have been remembered! *)
+    unfold BFNState.
+    remember (@Utils.run (@BFTape.ExecState BFN) bfn_step
+                         (@BFTape.exec_init BFN bfn input) fuel) as result.
     destruct result;
       now unfold bf_state_of_bfn_state.
-  Admitted.
+    Qed.
 
 End BFN.
