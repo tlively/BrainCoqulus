@@ -6,7 +6,7 @@ Import ListNotations.
 
 Load utils.
 
-Module StackMachine.
+Module SML.
 
   Inductive Item : Set :=
   | item_nat : nat -> Item
@@ -37,15 +37,6 @@ Module StackMachine.
     | [] => []
     | _ :: tl => tl
     end.
-
-  (* Monads ftw! *)
-  Definition bind {A B : Type} (a: option A) (f : A -> option B) :=
-    match a with
-    | None => None
-    | Some a => f a
-    end.
-
-  Notation "a >>= f" := (bind a f) (at level 50, left associativity).
 
   Definition tl_error {A} (l : list A) : option (list A) :=
     match l with
@@ -94,7 +85,7 @@ Module StackMachine.
   Proof.
   Admitted.
 
-  Function sm_step (s: SMState): option SMState :=
+  Definition sm_step (s: SMState): option SMState :=
     match s with
     | state smp fn_table stack output =>
       let state_from_stack (smp': SMProgram) (stack : Stack) :=
@@ -142,4 +133,4 @@ Module StackMachine.
     interpret [push 1 (out jump); push 3 (out sm_end)] 20 = Some [3; 1].
   Proof. auto. Qed.
 
-End StackMachine.
+End SML.
