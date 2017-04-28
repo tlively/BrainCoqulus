@@ -20,7 +20,7 @@ Module SML.
   (*| rotate : nat -> SMProgram -> SMProgram *)
   | pack : nat -> SMProgram -> SMProgram
   | unpack : SMProgram -> SMProgram
-  | jump : SMProgram
+  | call : SMProgram -> SMProgram
   | out : SMProgram -> SMProgram.
 
 
@@ -28,6 +28,7 @@ Module SML.
 
   Inductive SMState :=
     | running (ast: SMProgram)
+          (to_return: list SMProgram)
           (fn_table: list SMProgram)
           (stack: Stack)
           (output: list nat)
@@ -98,11 +99,14 @@ Module SML.
     match s with
     | halted _ => s
     | error _ => s
-    | running smp fn_table stack output =>
+    | running smp ret_list fn_table stack output =>
       let state_from_stack (smp': SMProgram) (stack : Stack) :=
-        running smp' fn_table stack output
+        running smp' ret_list fn_table stack output
       in match smp with
-      | sm_end => halted output
+      | sm_end => match ret_list with
+        | [] => halted output
+        | smp' :: tl => running smp' tl fn_table stack output 
+        end
       | push n smp' => state_from_stack smp' ((item_nat n) :: stack)
       | pop smp'=> sm_bind (tl_error stack) (state_from_stack smp') output
       | get n smp' =>
@@ -110,9 +114,9 @@ Module SML.
         in sm_bind new_stack (state_from_stack smp') output
       | pack n smp' => sm_bind (stack_pack n stack) (state_from_stack smp') output
       | unpack smp' => sm_bind (stack_unpack stack) (state_from_stack smp') output
-      | jump => match stack with
+      | call smp' => match stack with
         | (item_nat id) :: tl => sm_bind (nth_error fn_table id) 
-            (fun smp => running smp fn_table tl output) output
+            (fun smp => running smp (smp' :: ret_list) fn_table tl output) output
         | _ => error output
         end
       | out smp' => let out_char := 
@@ -120,21 +124,21 @@ Module SML.
         | (item_nat o) :: _ => Some o
         | _ => None
         end in 
-        sm_bind out_char (fun o => running smp' fn_table stack (o :: output)) output
+        sm_bind out_char (fun o => running smp' ret_list fn_table stack (o :: output)) output
       end
     end.
 
   (* TODO: Abstract the functions below along with the stuff in bftape.v *)
   Definition exec_output (state: SMState): list nat :=
     match state with 
-    | running _ _ _ output => output 
+    | running _ _ _ _ output => output 
     | halted output => output
     | error output => output    
     end.
 
   Definition exec_init (fn_table: list SMProgram) : SMState :=
     match fn_table with
-    | smp :: _ => running smp fn_table [] []
+    | smp :: _ => running smp [] fn_table [] []
     | [] => error []
     end.
 
@@ -146,7 +150,7 @@ Module SML.
   Proof. auto. Qed.
 
   Example jump_simple:
-    interpret [push 1 (out jump); push 3 (out sm_end)] 20 = [3; 1].
+    interpret [push 1 (out (call (push 2 (out sm_end)))); push 3 (out sm_end)] 20 = [2; 3; 1].
   Proof. auto. Qed.
 
 End SML.
