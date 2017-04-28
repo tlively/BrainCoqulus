@@ -69,7 +69,7 @@ Module SML.
 
   Example stack_pack_simple:
     stack_pack 2 [item_nat 0; item_nat 1] = Some [item_tuple [item_nat 0; item_nat 1]].
-  simpl. auto.
+  Proof. simpl. auto. Qed.
   
 
   Fixpoint stack_unpack (s: Stack) :=
@@ -81,12 +81,12 @@ Module SML.
       end
     end.
 
-  Lemma stack_pack_unpack (s s': Stack) (n: nat):
+  (*Lemma stack_pack_unpack (s s': Stack) (n: nat):
     n > 0 ->
     (stack_pack n s) = Some s' ->
     (stack_pack n s) >>= stack_unpack = Some s.
   Proof.
-  Admitted.
+  Admitted.*)
 
   Definition sm_bind {A : Type} (a: option A) (f : A -> SMState) (output: list nat) :=
     match a with
