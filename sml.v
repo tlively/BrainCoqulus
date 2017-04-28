@@ -5,6 +5,7 @@ Import ListNotations.
 
 
 Load utils.
+Load lambda.
 
 Module SML.
 
@@ -154,5 +155,45 @@ Module SML.
   Example jump_simple:
     interpret [push 1 (out (call (push 2 (out sm_end)))); push 3 (out sm_end)] 20 = [2; 3; 1].
   Proof. auto. Qed.
+
+
+  Fixpoint append (sm1 sm2: SMProgram) : SMProgram :=
+    match sm1 with
+    | sm_end => sm2
+    | push n smp' => push n (append smp' sm2) 
+    | pop smp' => pop (append smp' sm2)
+    | get n smp' => get n (append smp' sm2)
+    | pack n smp' => pack n (append smp' sm2)
+    | unpack smp' => unpack (append smp' sm2)
+    | call smp' => call (append smp' sm2)
+    | out smp' => out (append smp' sm2)
+    end.
+
+  Definition stack_diff (smp: SMProgram) : nat :=
+    0.
+
+Notation "s1 +++ s2" := (append s1 s2) (at level 50, left associativity).
+
+ Fixpoint lambda_to_sml (l : Lambda.Lambda) (fn_table: list SMProgram) (depth: nat) : SMProgram * list SMProgram :=
+    match l with
+    | Lambda.var n => let known_stack_size := 3 in
+      ((get (known_stack_size - n) sm_end), fn_table)
+    | Lambda.lam e => let (body, c1) := lambda_to_sml e fn_table (depth + 1) in
+      let diff := (stack_diff body) + depth in
+      let fn := body +++ (pack diff sm_end) in
+      (push (List.length c1) sm_end, c1 ++ [fn])
+    | Lambda.app e1 e2 => 
+      let (f, c1) := lambda_to_sml e1 fn_table depth in
+      let (v, c2) := lambda_to_sml e2 c1 depth in
+      ((v +++ f) +++ (unpack (call sm_end)), c2)
+    | Lambda.out e => let (body, c) := lambda_to_sml e fn_table depth in
+      (body +++ (out sm_end), c)
+    end.
+
+  Eval compute in (Lambda.parse_lambda "(\y.\x.x)(\x.x)").
+  Eval compute in (match (Lambda.parse_lambda "(\y. \x.x) (\x. x)") with
+      | Some x => lambda_to_sml x [] 0
+      | None => (sm_end, [])
+      end).
 
 End SML.

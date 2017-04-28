@@ -10,7 +10,6 @@ Require Import Coq.Program.Tactics.
 Import ListNotations.
 
 Load parse.
-Load sml.
 
 Module Lambda.
 
@@ -551,27 +550,5 @@ Module Lambda.
     interpret_lambda_readable lambda_echo "Hello, world!" 364 =
     "Hello, world!"%string.
   Proof. auto. Qed.
-
-  Fixpoint lambda_to_sml (l : Lambda) (ret_addr: option nat) : list SMProgram :=
-    match l with
-    | var n => match ret_addr with
-      | None => [SML.get n SML.sm_end]
-      | Some addr => [SML.get n (SML.push addr SML.jump)]
-    | out e => match lambda_to_sml e ret_addr with
-      | hd :: tl => (SML.out hd) :: tl
-      | [] => [] (* error *)
-    | lam e => match lambda_to_sml e ret_addr with
-      | [] => [] (* error *)
-      | lst => lst ++ []
-      
-    | app e1 e2 => match lambda_to_sml e2 ret_addr with
-      | [] => []
-      | lst => lst ++ [SML.push((List.length lst) - 1)
-
-
-      match e1 with
-      | lam e1' => 
-      | _ => []
-      end.
 
 End Lambda.
