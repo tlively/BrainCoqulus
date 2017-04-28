@@ -15,6 +15,43 @@ Module SML.
   | snat (n: nat) (s: Stack)
   | stuple (t: Stack) (s: Stack).
 
+  Function stack_prefix (n: nat) (s: Stack): option Stack :=
+    match n with
+    | 0 => Some snil
+    | S n' =>
+      match s with
+      | snil => None
+      | snat m s =>
+        match stack_prefix n' s with
+        | None => None
+        | Some s' => Some (snat m s')
+        end
+      | stuple t s =>
+        match stack_prefix n' s with
+        | None => None
+        | Some s' => Some (stuple t s')
+        end
+      end
+    end.
+
+  Function stack_postfix (n: nat) (s: Stack): option Stack :=
+    match n with
+    | 0 => Some s
+    | S n' =>
+      match s with
+      | snil => None
+      | snat _ s'
+      | stuple _ s' => stack_postfix n' s'
+      end
+    end.
+
+  Function stack_append (s1 s2: Stack): Stack :=
+    match s1 with
+    | snil => s2
+    | snat n s => snat n (stack_append s s2)
+    | stuple t s => stuple t (stack_append s s2)
+    end.
+
   Inductive SMCommand : Set :=
   | push (n: nat)
   | del (n: nat)
@@ -52,41 +89,11 @@ Module SML.
       end
     end.
 
-  Function stack_postfix (n: nat) (s: Stack): option Stack :=
-    match n with
-    | 0 => Some s
-    | S n' =>
-      match s with
-      | snil => None
-      | snat _ s'
-      | stuple _ s' => stack_postfix n' s'
-      end
-    end.
-
   Function stack_get (n: nat) (s: Stack): option Stack :=
     match stack_postfix n s with
     | None | Some snil => None
     | Some (snat m _) => Some (snat m s)
     | Some (stuple t _) => Some (stuple t s)
-    end.
-
-  Function stack_prefix (n: nat) (s: Stack): option Stack :=
-    match n with
-    | 0 => Some snil
-    | S n' =>
-      match s with
-      | snil => None
-      | snat m s =>
-        match stack_prefix n' s with
-        | None => None
-        | Some s' => Some (snat m s')
-        end
-      | stuple t s =>
-        match stack_prefix n' s with
-        | None => None
-        | Some s' => Some (stuple t s')
-        end
-      end
     end.
 
   Example stack_prefix_ex:
@@ -119,9 +126,12 @@ Module SML.
                    tl).
   Proof. intros; auto. Qed.
 
-  (* TODO: implement stack_unpack *)
   Function stack_unpack (s: Stack): option Stack :=
-    None.
+    match s with
+    | snil => None
+    | snat _ _ => Some s
+    | stuple t s => Some (stack_append t s)
+    end.
 
   Function stack_weight (s: Stack): nat :=
     match s with
@@ -146,12 +156,19 @@ Module SML.
       end
     end.
   Proof.
-    intros; inversion teq.
+    intros.
+    destruct s; simpl in *; try discriminate.
+    assert (stack_append s1 s2 = stuple t s') by congruence.
+    functional inversion H; subst; simpl in *; try omega.
+    clear H teq.
+    induction s; simpl in *; try omega.
   Defined.
 
-  (* TODO: implement stack_out *)
-  Function stack_out (s: Stack): (option Stack) * nat :=
-    (None, 0).
+  Function stack_out (s: Stack): (option nat) :=
+    match s with
+    | snat m s' => Some m
+    | _ => None
+    end.
 
   Definition sm_step (s: SMState): SMState :=
     match s with
@@ -193,8 +210,8 @@ Module SML.
         end
       | out :: smp' =>
         match stack_out stack with
-        | (Some stack', a) => running smp' rets fn_table stack' (output ++ [a])
-        | (None, _) => error
+        | Some a => running smp' rets fn_table stack (output ++ [a])
+        | None => error
         end
       end
     end.
@@ -209,16 +226,16 @@ Module SML.
     | _ => None
     end.
 
-  (* Example push_simple: *)
-  (*   interpret [push 3; out] [] 20 = Some [3]. *)
-  (* Proof. auto. Qed. *)
+  Example push_simple:
+    interpret [push 3; out] [] 20 = Some [3].
+  Proof. auto. Qed.
 
-  (* Example call_simple: *)
-  (*   interpret [push 0; out; call; push 2; out] [push 3; out;] 20 = [0; 3; 2]. *)
-  (* Proof. auto. Qed. *)
+  Example call_simple:
+    interpret [push 0; out; call; push 2; out] [[push 3; out]] 9 = Some [0; 3; 2].
+  Proof. auto. Qed.
 
-  (* Definition stack_diff (smp: SMProgram) : nat := *)
-  (*   0. *)
+  Definition stack_diff (smp: SMProgram) : nat :=
+    0.
 
   (* Function lambda_to_sml (l: Lambda.Lambda) (fn_table: list SMProgram) *)
   (*          (depth: nat) : SMProgram * list SMProgram := *)
