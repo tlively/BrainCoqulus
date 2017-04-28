@@ -56,9 +56,9 @@ Module SML.
 
   Fixpoint stack_pack (n : nat) (s: Stack) :=
   match n with
-  | 0 => Some s
-  | S 0 => match s with
-    | k :: tl => Some ((item_tuple [k]) :: tl)
+  | 0 | S 0=> Some s
+  | S (S 0) => match s with
+    | l :: k :: tl => Some ((item_tuple (l :: [k])) :: tl)
     | _ => None
     end
   | S n => (stack_pack n s) >>= (fun s =>
@@ -72,7 +72,9 @@ Module SML.
     stack_pack 2 [item_nat 0; item_nat 1] = Some [item_tuple [item_nat 0; item_nat 1]].
   Proof. simpl. auto. Qed.
   
-
+  Eval compute in stack_pack 2 ([item_tuple [item_nat 0; item_nat 1]; item_nat 2; item_nat 3;
+         item_nat 4]).
+  
   Fixpoint stack_unpack (s: Stack) :=
     match s with
     | [] => None
@@ -105,7 +107,7 @@ Module SML.
       in match smp with
       | sm_end => match ret_list with
         | [] => halted output
-        | smp' :: tl => running smp' tl fn_table stack output 
+        | smp' :: tl => running smp' tl fn_table stack output
         end
       | push n smp' => state_from_stack smp' ((item_nat n) :: stack)
       | pop smp'=> sm_bind (tl_error stack) (state_from_stack smp') output
@@ -133,7 +135,7 @@ Module SML.
     match state with 
     | running _ _ _ _ output => output 
     | halted output => output
-    | error output => output    
+    | error output => output
     end.
 
   Definition exec_init (fn_table: list SMProgram) : SMState :=
