@@ -254,14 +254,14 @@ Module SML.
     | ctx smp fn_table n_args stack_size =>
       match l with
       | Lambda.var n =>
-        ctx (smp ++ [get (stack_size - n)]) fn_table n_args (S stack_size)
+        ctx (smp ++ [get (stack_size - n - 1)]) fn_table n_args (S stack_size)
       | Lambda.lam e =>
         match lambda_to_sml e (ctx [] fn_table (S n_args) (S n_args)) with
         | ctx body fn_table' _ stack_size' =>
           (* remove arguments at end of body, leaving only return val *)
           let body := body ++ (repeat (del 1) (S n_args)) in
           (* retrieve args and create closure *)
-          let smp := smp ++ (repeat (get stack_size) n_args)
+          let smp := smp ++ (repeat (get (stack_size - 1)) n_args)
                          ++ [push (List.length fn_table')]
                          ++ [pack (S n_args)] in
           ctx smp (fn_table' ++ [body]) n_args (S stack_size')
@@ -289,83 +289,18 @@ Module SML.
       ((* bootstrap ++ *) smp (* ++ [call] *), fn_table)
     end.
 
-  Definition instance :=
+    Example run_trans_out_2:
     match (Lambda.parse_lambda "^(\f.\x.f (f x))") with
-    | Some l => sml_of_lambda l
-    | None => ([], [])
-    end.
+    | Some l => interpret (sml_of_lambda l) 27
+    | None => None
+    end = Some [2].
+  Proof. auto. Qed.
 
-  Eval compute in instance.
-
-  Definition instance2 :=
+  Example run_trans_out_f_id_2:
     match (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") with
-    | Some l => sml_of_lambda l
-    | None => ([],[])
-    end.
-
-  Example run_trans_out_2: interpret instance 27 = Some [2].
-  Proof.
-    unfold interpret.
-    replace instance with
-    ([push 2; pack 1; push 0; push 0; get 2; call; call; out; del 0],
-     [[inc]; [get 2; get 2; call; get 2; call; del 1; del 1];
-      [get 1; push 1; pack 2; del 1]]) by auto.
-    Set Printing Depth 100.
-    unfold exec_init.
-    unfold Utils.run.
-    unfold sm_step at 27.
-    unfold sm_step at 26;
-      unfold stack_pack.
-    unfold sm_step at 25.
-    unfold sm_step at 24.
-    unfold sm_step at 23;
-      unfold stack_get, stack_postfix.
-    unfold sm_step at 22;
-      rewrite stack_call_equation;
-      unfold stack_unpack, nth_error.
-    unfold sm_step at 21;
-      unfold stack_get, stack_postfix.
-    unfold sm_step at 20.
-    unfold sm_step at 19;
-      unfold stack_pack, stack_prefix, stack_postfix.
-    unfold sm_step at 18;
-      unfold stack_del.
-    unfold sm_step at 17.
-    unfold sm_step at 16;
-      rewrite stack_call_equation;
-      unfold stack_unpack, stack_append, nth_error.
-    unfold sm_step at 15;
-      unfold stack_get, stack_postfix.
-    unfold sm_step at 14;
-      unfold stack_get, stack_postfix.
-    unfold sm_step at 13;
-      rewrite stack_call_equation;
-      unfold stack_unpack, nth_error.
-    unfold sm_step at 12;
-      unfold stack_inc.
-    unfold sm_step at 11.
-    unfold sm_step at 10;
-      unfold stack_get, stack_postfix.
-    unfold sm_step at 9;
-      rewrite stack_call_equation;
-      unfold stack_unpack, nth_error.
-    unfold sm_step at 8;
-      unfold stack_inc.
-    unfold sm_step at 7.
-    unfold sm_step at 6;
-      unfold stack_del.
-    unfold sm_step at 5;
-      unfold stack_del.
-    unfold sm_step at 4.
-    unfold sm_step at 3;
-      unfold stack_out.
-    unfold sm_step at 2;
-      unfold stack_del.
-    unfold sm_step at 1.
-    (* FIXME *)
-  Abort.
-
-  Example run_trans_out_f_id_2: interpret instance2 100 = Some [2].
-  Abort.
+    | Some l => interpret (sml_of_lambda l) 42
+    | None => None
+    end = Some [2].
+  Proof. auto. Qed.
 
 End SML.
