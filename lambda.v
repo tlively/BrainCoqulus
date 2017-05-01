@@ -9,6 +9,7 @@ Require Import Strings.Ascii.
 Require Import Coq.Program.Tactics.
 Import ListNotations.
 
+Load utils.
 Load parse.
 
 Module Lambda.
@@ -297,57 +298,85 @@ Module Lambda.
     | _ => None
     end.
 
+  Inductive LambdaState :=
+  | running (e: Lambda) (output: list nat)
+  | halted (e: Lambda) (output: list nat)
+  | error.
+
   (* Call by value semantics *)
-  Function lambda_step (e: Lambda): option (Lambda * option nat) :=
+  Function lambda_reduce_step (e: Lambda): LambdaState :=
     match e with
-    | var _ => None
-    | lam _ => None
-    | out e' =>
-      match lambda_step e' with
-      | Some (e'', n) => Some (out e'', n)
-      | None => Some (e', nat_of_lambda e')
+    | var _ => error
+    | lam _ => halted e []
+    | out e =>
+      match lambda_reduce_step e with
+      | running e' output => running (out e') output
+      | halted e' output =>
+        match nat_of_lambda e' with
+        | Some n => running e' (output ++ [n])
+        | None => error
+        end
+      | error => error
       end
     | app e1 e2 =>
-      match lambda_step e1 with
-      | Some (e1', n) => Some (app e1' e2, n)
-      | None =>
-        match lambda_step e2 with
-        | Some (e2', n) => Some (app e1 e2', n)
-        | None =>
+      match lambda_reduce_step e1 with
+      | running e1' output => running (app e1' e2) output
+      | halted _ _ =>
+        match lambda_reduce_step e2 with
+        | running e2' output => running (app e1 e2') output
+        | halted e2' _ =>
           match e1 with
-          | lam e1' => Some (lambda_replace e1' e2 0, None)
-          | _ => None
+          | lam e1' => running (lambda_replace e1' e2 0) []
+          | _ => error
           end
+        | error => error
         end
+      | error => error
       end
     end.
 
-  Inductive LambdaState :=
-  | l_state (output: list nat) (l: Lambda).
-
-  Function lambda_steps (state: LambdaState) (fuel: nat):
-    (LambdaState * nat) :=
-    match fuel with
-    | 0 => (state, fuel)
-    | S f =>
-      match state with
-      | l_state output e =>
-        match lambda_step e with
-        | Some (e', None) => lambda_steps (l_state output e') f
-        | Some (e', Some n) => lambda_steps (l_state (output ++ [n]) e') f
-        | None => (state, fuel)
-        end
+  Function lambda_step (s: LambdaState): LambdaState :=
+    match s with
+    | halted _ _ | error => s
+    | running e output =>
+      match lambda_reduce_step e with
+      | running e' output' => running e' (output ++ output')
+      | halted e' output' => halted e' (output ++ output')
+      | error => error
       end
     end.
 
-  Function lambda_run (state: LambdaState) (fuel: nat): option LambdaState :=
-    match lambda_steps state fuel with
-    | (_, 0) => None
-    | (state' , _) => Some state'
+    Function lambda_unfold_nat (n: nat): Lambda :=
+    match n with
+    | 0 => var 0
+    | S n' => app (var 1) (lambda_unfold_nat n')
+    end.
+
+  Definition lambda_of_nat (n: nat): Lambda :=
+    lam (lam (lambda_unfold_nat n)).
+
+  (* TODO: Reduce before returning *)
+  Function lambda_of_nats (ns: list nat): Lambda :=
+    match ns with
+    | [] => (lam (app (app (var 0) (lam (lam (var 1)))) (lam (var 0))))
+    | hd :: tl => lam (app (app (var 0) (lam (lam (var 0))))
+                           (lam (app (app (var 0) (lambda_of_nat hd))
+                                     (lambda_of_nats tl))))
+    end.
+
+  Function exec_init (e: Lambda) (input: list nat): LambdaState :=
+    running e [].
+
+  Function interpret_lambda (e: Lambda) (input: list nat) (fuel: nat):
+    option (list nat) :=
+    let init := exec_init (app e (lambda_of_nats input)) [] in
+    match Utils.run lambda_step init fuel with
+    | error | running _ _ => None
+    | halted _ output => Some output
     end.
 
   Inductive LambdaNorm :=
-  | norm (l: Lambda) (term: lambda_step l = None)
+  | norm (l: Lambda) (term: lambda_reduce_step l = halted l [])
          (no_free: forall l' n, lambda_replace l l' n = l).
 
   Function get_lam (ln: LambdaNorm): Lambda :=
@@ -416,8 +445,10 @@ Module Lambda.
 
   Lemma isempty_correct_emp:
     exists f,
-      lambda_run (l_state [] (app (get_lam l_isempty) (get_lam l_empty))) f =
-      Some (l_state [] (get_lam l_true)).
+      Utils.run
+        lambda_step
+        (exec_init (app (get_lam l_isempty) (get_lam l_empty)) []) f =
+      halted (get_lam l_true) [].
   Proof.
     exists 10.
     auto.
@@ -425,15 +456,16 @@ Module Lambda.
 
   Lemma isempty_correct_cons (hd tl: LambdaNorm):
     exists f,
-      lambda_run
-        (l_state [] (app (get_lam l_isempty)
-                         (app (app (get_lam l_cons) (get_lam hd))
-                              (get_lam tl)))) f =
-      Some (l_state [] (get_lam l_false)).
+      Utils.run
+        lambda_step
+        (exec_init (app (get_lam l_isempty)
+                        (app (app (get_lam l_cons) (get_lam hd))
+                             (get_lam tl))) []) f =
+      halted (get_lam l_false) [].
   Proof.
     exists 7.
     destruct hd, tl.
-    unfold lambda_run.
+    unfold Utils.run.
     simpl.
     unfold ISEMPTY; simpl.
     rewrite term.
@@ -441,22 +473,18 @@ Module Lambda.
     now rewrite term0.
   Qed.
 
-  Eval compute in lambda_steps
-        (l_state [] (app (get_lam l_head)
-                         (app (app (get_lam l_cons) (get_lam l_zero))
-                              (get_lam l_empty)))) 9.
-
   Lemma head_correct (hd tl: LambdaNorm):
     exists f,
-      lambda_run
-        (l_state [] (app (get_lam l_head)
-                         (app (app (get_lam l_cons) (get_lam hd))
-                              (get_lam tl)))) f =
-      Some (l_state [] (get_lam hd)).
+      Utils.run
+        lambda_step
+        (exec_init (app (get_lam l_head)
+                        (app (app (get_lam l_cons) (get_lam hd))
+                             (get_lam tl))) []) f =
+      halted (get_lam hd) [].
   Proof.
     exists 10.
     destruct hd, tl.
-    unfold lambda_run; simpl.
+    unfold Utils.run; simpl.
     rewrite term.
     unfold HEAD, CONS; simpl.
     rewrite term0; simpl.
@@ -466,20 +494,22 @@ Module Lambda.
     simpl.
     rewrite term0.
     rewrite no_free.
+    unfold lambda_step.
     now rewrite term.
   Qed.
 
   Lemma tail_correct (hd tl: LambdaNorm):
     exists f,
-      lambda_run
-        (l_state [] (app (get_lam l_tail)
-                         (app (app (get_lam l_cons) (get_lam hd))
-                              (get_lam tl)))) f =
-      Some (l_state [] (get_lam tl)).
+      Utils.run
+        lambda_step
+        (exec_init (app (get_lam l_tail)
+                        (app (app (get_lam l_cons) (get_lam hd))
+                             (get_lam tl))) []) f =
+      halted (get_lam tl) [].
   Proof.
     exists 10.
     destruct hd, tl.
-    unfold lambda_run; simpl.
+    unfold Utils.run; simpl.
     rewrite term.
     unfold HEAD, CONS; simpl.
     rewrite term0; simpl.
@@ -487,38 +517,9 @@ Module Lambda.
     repeat rewrite no_free0.
     rewrite term.
     simpl.
+    unfold lambda_step.
     now repeat rewrite term0.
   Qed.
-
-  Function lambda_unfold_nat (n: nat): Lambda :=
-    match n with
-    | 0 => var 0
-    | S n' => app (var 1) (lambda_unfold_nat n')
-    end.
-
-  Definition lambda_of_nat (n: nat): Lambda :=
-    lam (lam (lambda_unfold_nat n)).
-
-  (* TODO: Reduce before returning *)
-  Function lambda_of_nats (ns: list nat): Lambda :=
-    match ns with
-    | [] => get_lam l_empty
-    | hd :: tl => lam (app (app (var 0) (lam (lam (var 0))))
-                           (lam (app (app (var 0) (lambda_of_nat hd))
-                                     (lambda_of_nats tl))))
-    end.
-
-  (* The important interpreter as far as the spec is concerned *)
-  Function interpret_lambda (prog: string) (input: list nat) (f: nat):
-    option (list nat) :=
-    match parse_lambda prog with
-    | None => None
-    | Some l =>
-      match lambda_run (l_state [] (app l (lambda_of_nats input))) f with
-      | None => None
-      | Some (l_state output _) => Some output
-      end
-    end.
 
   Function nats_of_string (str: string): list nat :=
     match str with
@@ -534,9 +535,13 @@ Module Lambda.
 
   Function interpret_lambda_readable (prog: string) (input: string) (f: nat):
     string :=
-    match interpret_lambda prog (nats_of_string input) f with
-    | None => EmptyString
-    | Some ns => string_of_nats ns
+    match parse_lambda prog with
+    | None =>  EmptyString
+    | Some e =>
+      match interpret_lambda e (nats_of_string input) f with
+      | None => EmptyString
+      | Some ns => string_of_nats ns
+      end
     end.
 
   Definition lambda_echo: string :=
