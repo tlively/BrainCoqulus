@@ -3,7 +3,6 @@ Require Import Omega.
 Require Import Coq.Lists.List.
 Import ListNotations.
 
-Load utils.
 Load lambda.
 Load stack.
 
@@ -14,6 +13,7 @@ Module SML.
   | del (n: nat)
   | get (n: nat)
   | pack (n: nat)
+  | test_and_skip
   | unpack
   | call
   | inc
@@ -82,6 +82,14 @@ Module SML.
         | Some stack' => running smp' rets fn_table stack' output
         | None => error
         end
+      | test_and_skip :: to_skip :: smp' =>
+        match Stack.stack_out stack with
+        | Some hd => if (hd =? 0) then 
+          (running smp' rets fn_table stack output)
+          else (running (to_skip :: smp') rets fn_table stack output)
+        | None => error
+        end
+      | test_and_skip :: _ => error
       | unpack :: smp' =>
         match Stack.stack_unpack stack with
         | Some stack' => running smp' rets fn_table stack' output
