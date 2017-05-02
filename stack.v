@@ -46,7 +46,7 @@ Module Stack.
     | snat n s => snat n (stack_append s s2)
     | stuple t s => stuple t (stack_append s s2)
     end.
- 
+
   Function stack_del (n: nat) (s: Stack): option Stack :=
     match (s, n) with
     | (snil, _) => None
@@ -121,9 +121,16 @@ Module Stack.
     | _ => None
     end.
 
+  Function stack_dec (s: Stack): option Stack :=
+    match s with
+    | snat m s' => Some (snat (pred m) s')
+    | _ => None
+    end.
+
   Function stack_out (s: Stack): (option nat) :=
     match s with
     | snat m s' => Some m
     | _ => None
     end.
+
 End Stack.

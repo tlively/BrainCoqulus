@@ -443,83 +443,83 @@ Module Lambda.
     refine (norm (parse_def Z) _ _); auto.
   Defined.
 
-  Lemma isempty_correct_emp:
-    exists f,
-      Utils.run
-        lambda_step
-        (exec_init (app (get_lam l_isempty) (get_lam l_empty)) []) f =
-      halted (get_lam l_true) [].
-  Proof.
-    exists 10.
-    auto.
-  Qed.
+  (* Lemma isempty_correct_emp: *)
+  (*   exists f, *)
+  (*     Utils.run *)
+  (*       lambda_step *)
+  (*       (exec_init (app (get_lam l_isempty) (get_lam l_empty)) []) f = *)
+  (*     halted (get_lam l_true) []. *)
+  (* Proof. *)
+  (*   exists 10. *)
+  (*   auto. *)
+  (* Qed. *)
 
-  Lemma isempty_correct_cons (hd tl: LambdaNorm):
-    exists f,
-      Utils.run
-        lambda_step
-        (exec_init (app (get_lam l_isempty)
-                        (app (app (get_lam l_cons) (get_lam hd))
-                             (get_lam tl))) []) f =
-      halted (get_lam l_false) [].
-  Proof.
-    exists 7.
-    destruct hd, tl.
-    unfold Utils.run.
-    simpl.
-    unfold ISEMPTY; simpl.
-    rewrite term.
-    simpl.
-    now rewrite term0.
-  Qed.
+  (* Lemma isempty_correct_cons (hd tl: LambdaNorm): *)
+  (*   exists f, *)
+  (*     Utils.run *)
+  (*       lambda_step *)
+  (*       (exec_init (app (get_lam l_isempty) *)
+  (*                       (app (app (get_lam l_cons) (get_lam hd)) *)
+  (*                            (get_lam tl))) []) f = *)
+  (*     halted (get_lam l_false) []. *)
+  (* Proof. *)
+  (*   exists 7. *)
+  (*   destruct hd, tl. *)
+  (*   unfold Utils.run. *)
+  (*   simpl. *)
+  (*   unfold ISEMPTY; simpl. *)
+  (*   rewrite term. *)
+  (*   simpl. *)
+  (*   now rewrite term0. *)
+  (* Qed. *)
 
-  Lemma head_correct (hd tl: LambdaNorm):
-    exists f,
-      Utils.run
-        lambda_step
-        (exec_init (app (get_lam l_head)
-                        (app (app (get_lam l_cons) (get_lam hd))
-                             (get_lam tl))) []) f =
-      halted (get_lam hd) [].
-  Proof.
-    exists 10.
-    destruct hd, tl.
-    unfold Utils.run; simpl.
-    rewrite term.
-    unfold HEAD, CONS; simpl.
-    rewrite term0; simpl.
-    repeat rewrite no_free.
-    repeat rewrite no_free0.
-    rewrite term.
-    simpl.
-    rewrite term0.
-    rewrite no_free.
-    unfold lambda_step.
-    now rewrite term.
-  Qed.
+  (* Lemma head_correct (hd tl: LambdaNorm): *)
+  (*   exists f, *)
+  (*     Utils.run *)
+  (*       lambda_step *)
+  (*       (exec_init (app (get_lam l_head) *)
+  (*                       (app (app (get_lam l_cons) (get_lam hd)) *)
+  (*                            (get_lam tl))) []) f = *)
+  (*     halted (get_lam hd) []. *)
+  (* Proof. *)
+  (*   exists 10. *)
+  (*   destruct hd, tl. *)
+  (*   unfold Utils.run; simpl. *)
+  (*   rewrite term. *)
+  (*   unfold HEAD, CONS; simpl. *)
+  (*   rewrite term0; simpl. *)
+  (*   repeat rewrite no_free. *)
+  (*   repeat rewrite no_free0. *)
+  (*   rewrite term. *)
+  (*   simpl. *)
+  (*   rewrite term0. *)
+  (*   rewrite no_free. *)
+  (*   unfold lambda_step. *)
+  (*   now rewrite term. *)
+  (* Qed. *)
 
-  Lemma tail_correct (hd tl: LambdaNorm):
-    exists f,
-      Utils.run
-        lambda_step
-        (exec_init (app (get_lam l_tail)
-                        (app (app (get_lam l_cons) (get_lam hd))
-                             (get_lam tl))) []) f =
-      halted (get_lam tl) [].
-  Proof.
-    exists 10.
-    destruct hd, tl.
-    unfold Utils.run; simpl.
-    rewrite term.
-    unfold HEAD, CONS; simpl.
-    rewrite term0; simpl.
-    repeat rewrite no_free.
-    repeat rewrite no_free0.
-    rewrite term.
-    simpl.
-    unfold lambda_step.
-    now repeat rewrite term0.
-  Qed.
+  (* Lemma tail_correct (hd tl: LambdaNorm): *)
+  (*   exists f, *)
+  (*     Utils.run *)
+  (*       lambda_step *)
+  (*       (exec_init (app (get_lam l_tail) *)
+  (*                       (app (app (get_lam l_cons) (get_lam hd)) *)
+  (*                            (get_lam tl))) []) f = *)
+  (*     halted (get_lam tl) []. *)
+  (* Proof. *)
+  (*   exists 10. *)
+  (*   destruct hd, tl. *)
+  (*   unfold Utils.run; simpl. *)
+  (*   rewrite term. *)
+  (*   unfold HEAD, CONS; simpl. *)
+  (*   rewrite term0; simpl. *)
+  (*   repeat rewrite no_free. *)
+  (*   repeat rewrite no_free0. *)
+  (*   rewrite term. *)
+  (*   simpl. *)
+  (*   unfold lambda_step. *)
+  (*   now repeat rewrite term0. *)
+  (* Qed. *)
 
   Function nats_of_string (str: string): list nat :=
     match str with

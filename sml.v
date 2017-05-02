@@ -13,10 +13,12 @@ Module SML.
   | del (n: nat)
   | get (n: nat)
   | pack (n: nat)
-  | test_and_skip
   | unpack
+  | cond_get (n k: nat)
   | call
   | inc
+  | dec
+  | read
   | out.
 
   Definition SMProgram := list SMCommand.
@@ -51,6 +53,7 @@ Module SML.
           (returns: list SMProgram)
           (fn_table: list SMProgram)
           (stack: Stack)
+          (input: list nat)
           (output: list nat)
     | halted (output: list nat)
     | error.
@@ -58,57 +61,73 @@ Module SML.
   Definition sm_step (s: SMState): SMState :=
     match s with
     | halted _ | error => s
-    | running smp rets fn_table stack output =>
+    | running smp rets fn_table stack input output =>
       match smp with
       | [] =>
         match rets with
-        | smp' :: rets' => running smp' rets' fn_table stack output
+        | smp' :: rets' => running smp' rets' fn_table stack input output
         | _ => halted output
         end
       | push n :: smp' =>
-        running smp' rets fn_table (Stack.snat n stack) output
+        running smp' rets fn_table (Stack.snat n stack) input output
       | del n :: smp' =>
         match Stack.stack_del n stack with
-        | Some stack' => running smp' rets fn_table stack' output
+        | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | get n :: smp' =>
         match Stack.stack_get n stack with
-        | Some stack' => running smp' rets fn_table stack' output
+        | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | pack n :: smp' =>
         match Stack.stack_pack n stack with
-        | Some stack' => running smp' rets fn_table stack' output
+        | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
-      | test_and_skip :: to_skip :: smp' =>
-        match Stack.stack_out stack with
-        | Some hd => if (hd =? 0) then 
-          (running smp' rets fn_table stack output)
-          else (running (to_skip :: smp') rets fn_table stack output)
-        | None => error
-        end
-      | test_and_skip :: _ => error
       | unpack :: smp' =>
         match Stack.stack_unpack stack with
-        | Some stack' => running smp' rets fn_table stack' output
+        | Some stack' => running smp' rets fn_table stack' input output
         | None => error
+        end
+      | cond_get n k :: smp' =>
+        match stack with
+        | Stack.snat 0 _ =>
+          match Stack.stack_get n stack with
+          | Some stack' => running smp' rets fn_table stack' input output
+          | None => error
+          end
+        | Stack.snat _ _ =>
+          match Stack.stack_get k stack with
+          | Some stack' => running smp' rets fn_table stack' input output
+          | None => error
+          end
+        | _ => error
         end
       | call :: smp' =>
         match stack_call stack fn_table with
         | (Some stack', smf) =>
-          running smf (smp' :: rets) fn_table stack' output
+          running smf (smp' :: rets) fn_table stack' input output
         | (None, _) => error
         end
       | inc :: smp' =>
         match Stack.stack_inc stack with
-        | Some stack' => running smp' rets fn_table stack' output
+        | Some stack' => running smp' rets fn_table stack' input output
         | None => error
+        end
+      | dec :: smp' =>
+        match Stack.stack_dec stack with
+        | Some stack' => running smp' rets fn_table stack' input output
+        | None => error
+        end
+      | read :: smp' =>
+        match input with
+        | [] =>  running smp' rets fn_table (Stack.snat 0 stack) [] output
+        | a :: tl => running smp' rets fn_table (Stack.snat a stack) tl output
         end
       | out :: smp' =>
         match Stack.stack_out stack with
-        | Some a => running smp' rets fn_table stack (output ++ [a])
+        | Some a => running smp' rets fn_table stack input (output ++ [a])
         | None => error
         end
       end
