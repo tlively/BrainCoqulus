@@ -192,8 +192,10 @@ Module SML.
   | [] => []
   | (body, table) :: tl => 
     let new_lib := map (bump_function_ids_by 1) (make_library tl) in
-    body :: new_lib ++ (map (bump_function_ids_by (List.length (body :: new_lib))) table)
+    let new_body := bump_function_ids_by (List.length (body :: new_lib)) body in
+    new_body :: new_lib ++ (map (bump_function_ids_by (List.length (body :: new_lib))) table)
   end.
+
 
   Definition force_parse_lambda l := match Lambda.parse_lambda l with
     | Some l => l
@@ -251,14 +253,44 @@ Module SML.
   Proof. auto. Qed.
   Eval compute in Lambda.parse_lambda "^(\f.\x.f (f x))".
 
-  Example run_trans_out_2:
-    (Lambda.parse_lambda "^(\f.\x.f (f x))") >>= 
-      (fun l => interpret_sm (lambda_to_sml l) [] 30) = Some [2].
-  Proof. auto. Qed.
+  Definition parse_lambda_and_compile (lambda_prog : string) :=
+    (Lambda.parse_lambda lambda_prog) >>= (fun l => Some (compile_lambda_to_sml l)).
+
+  Definition compile_and_interpret (lambda_prog : string) (input : list nat) (f : nat)
+    : option (list nat) :=
+    (parse_lambda_and_compile lambda_prog) >>= (fun l => interpret_sm l input f).
+
+  Example run_trans_out_2: 
+    compile_and_interpret "^(\f.\x.f (f x))" [] 50 = Some [2].
+  Proof. unfold compile_and_interpret. simpl. unfold Utils.bind. auto. Qed.
 
   Example run_trans_out_f_id_2:
-    (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") >>=
-    (fun l => interpret_sm (lambda_to_sml l) [] 42) = Some [2].
+    compile_and_interpret "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))" [] 42 = Some [2].
   Proof. auto. Qed.
+
+  Function nats_of_string (str: string): list nat :=
+    match str with
+    | EmptyString => []
+    | String a str' => nat_of_ascii a :: (nats_of_string str')
+    end.
+
+  Function string_of_nats (ns: list nat): string :=
+    match ns with
+    | [] => EmptyString
+    | n :: ns' => String (ascii_of_nat n) (string_of_nats ns')
+    end.
+
+  Function interpret_readable (prog: SMProgram * list SMProgram) (input: string) (f: nat):
+    string :=
+    match interpret_sm prog (nats_of_string input) f with
+    | None => EmptyString
+    | Some ns => string_of_nats ns
+    end.
+
+  Example run_trans_with_input_1:
+    (Lambda.parse_lambda Lambda.lambda_echo) >>= 
+      (fun l => Some (interpret_readable (compile_lambda_to_sml l) ("Hello"%string) 30))
+      = Some "Hello"%string.
+  
 
 End SML.
