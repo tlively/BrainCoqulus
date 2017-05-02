@@ -133,23 +133,23 @@ Module SML.
       end
     end.
 
-  Definition exec_init (main: SMProgram) (fn_table: list SMProgram) : SMState :=
-    running main [] fn_table Stack.snil [].
+  Definition exec_init (main: SMProgram) (fn_table: list SMProgram) (input : list nat) : SMState :=
+    running main [] fn_table Stack.snil input [].
 
-  Definition interpret_sm (prog: SMProgram * list SMProgram) (fuel: nat):
+  Definition interpret_sm (prog: SMProgram * list SMProgram) (input : list nat) (fuel: nat):
     option (list nat) :=
     let (main, fn_table) := prog in
-    match Utils.run sm_step (exec_init main fn_table) fuel with
+    match Utils.run sm_step (exec_init main fn_table input) fuel with
     | halted output => Some output
     | _ => None
     end.
 
   Example push_simple:
-    interpret_sm ([push 3; out], []) 20 = Some [3].
+    interpret_sm ([push 3; out], []) [] 20 = Some [3].
   Proof. auto. Qed.
 
   Example call_simple:
-    interpret_sm ([push 0; out; call; push 2; out], [[push 3; out]]) 9 = Some [0; 3; 2].
+    interpret_sm ([push 0; out; call; push 2; out], [[push 3; out]]) [] 9 = Some [0; 3; 2].
   Proof. auto. Qed.
 
   Inductive Ctx :=
@@ -197,16 +197,50 @@ Module SML.
 
     Example run_trans_out_2:
     match (Lambda.parse_lambda "^(\f.\x.f (f x))") with
-    | Some l => interpret_sm (sml_of_lambda l) 27
+    | Some l => interpret_sm (sml_of_lambda l) [] 27
     | None => None
     end = Some [2].
   Proof. auto. Qed.
 
   Example run_trans_out_f_id_2:
     match (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") with
-    | Some l => interpret_sm (sml_of_lambda l) 42
+    | Some l => interpret_sm (sml_of_lambda l) [] 42
     | None => None
     end = Some [2].
   Proof. auto. Qed.
+
+  Fixpoint bump_function_ids_by (n : nat) (smp : SMProgram) : SMProgram :=
+    match smp with
+    | [] => []
+    | push m :: smp' => push (m + n) :: (bump_function_ids_by n smp')
+    | hd :: smp' => hd :: (bump_function_ids_by n smp')
+    end.
+
+
+  Definition sm_table_from_program (prog : SMProgram * list SMProgram) 
+    : list SMProgram := 
+    let (smp, fn_table) := prog in
+    smp :: (map (bump_function_ids_by 1) fn_table).
+
+  Fixpoint make_library (progs : list (SMProgram * list SMProgram)) : list SMProgram :=
+  match progs with
+  | [] => []
+  | (body, table) :: tl => 
+    let new_lib := map (bump_function_ids_by 1) (make_library tl) in
+    body :: new_lib ++ (map (bump_function_ids_by (List.length (body :: new_lib))) table)
+  end.
+
+  Definition force_parse_lambda l := match Lambda.parse_lambda l with
+    | Some l => l
+    | None => Lambda.var 0 (* Bogus *)
+    end.
+
+  Definition nil := sml_of_lambda (force_parse_lambda Lambda.EMPTY).
+  Definition cons := sml_of_lambda (force_parse_lambda Lambda.CONS).
+  Definition zero := sml_of_lambda (force_parse_lambda Lambda.ZERO).
+  Definition succ := sml_of_lambda (force_parse_lambda Lambda.SUCC).
+
+  Definition std_lib := make_library [nil; cons; zero; succ].
+
 
 End SML.
