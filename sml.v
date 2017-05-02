@@ -133,36 +133,17 @@ Module SML.
       end
     end.
 
-  Definition exec_init (main: SMProgram) (fn_table: list SMProgram) (input : list nat) : SMState :=
-    running main [] fn_table Stack.snil input [].
-
-  Definition interpret_sm (prog: SMProgram * list SMProgram) (input : list nat) (fuel: nat):
-    option (list nat) :=
-    let (main, fn_table) := prog in
-    match Utils.run sm_step (exec_init main fn_table input) fuel with
-    | halted output => Some output
-    | _ => None
-    end.
-
-  Example push_simple:
-    interpret_sm ([push 3; out], []) [] 20 = Some [3].
-  Proof. auto. Qed.
-
-  Example call_simple:
-    interpret_sm ([push 0; out; call; push 2; out], [[push 3; out]]) [] 9 = Some [0; 3; 2].
-  Proof. auto. Qed.
-
   Inductive Ctx :=
   | ctx (smp: SMProgram) (fn_table: list SMProgram) (n_args stack_size: nat).
 
-  Function lambda_to_sml (l: Lambda.Lambda) (c: Ctx): Ctx :=
+  Function lambda_to_sml_helper (l: Lambda.Lambda) (c: Ctx): Ctx :=
     match c with
     | ctx smp fn_table n_args stack_size =>
       match l with
       | Lambda.var n =>
         ctx (smp ++ [get (stack_size - n - 1)]) fn_table n_args (S stack_size)
       | Lambda.lam e =>
-        match lambda_to_sml e (ctx [] fn_table (S n_args) (S n_args)) with
+        match lambda_to_sml_helper e (ctx [] fn_table (S n_args) (S n_args)) with
         | ctx body fn_table' _ stack_size' =>
           (* remove arguments at end of body, leaving only return val *)
           let body := body ++ (repeat (del 1) (S n_args)) in
@@ -173,12 +154,12 @@ Module SML.
           ctx smp (fn_table' ++ [body]) n_args (S stack_size')
         end
       | Lambda.app e1 e2 =>
-        match lambda_to_sml e1 (lambda_to_sml e2 c) with
+        match lambda_to_sml_helper e1 (lambda_to_sml_helper e2 c) with
         | ctx smp fn_table' _ stack_size' =>
           ctx (smp ++ [call]) fn_table' n_args (pred stack_size')
         end
       | Lambda.out e =>
-        match lambda_to_sml e c with
+        match lambda_to_sml_helper e c with
         | ctx smp fn_table' _ stack_size' =>
           let smp := smp ++ [push 0; push 0; get 2; call; call; out; del 0] in
           ctx smp fn_table' n_args stack_size'
@@ -188,34 +169,18 @@ Module SML.
 
   (* Start context with a placeholder for !add. Assume input
      list already on stack *)
-  Function sml_of_lambda (l: Lambda.Lambda): (SMProgram * list SMProgram) :=
-    match lambda_to_sml l (ctx [] [[inc]] 0 (* 1 *) 0) with
-    | ctx smp fn_table _ _ =>
-      (* TODO: Add input injection code before smp *)
-      ((* bootstrap ++ *) smp (* ++ [call] *), fn_table)
+  Definition lambda_to_sml (l: Lambda.Lambda): (SMProgram * list SMProgram) :=
+    match lambda_to_sml_helper l (ctx [] [[inc]] 0 (* 1 *) 0) with
+    | ctx smp fn_table _ _ => (smp , fn_table)
     end.
 
-    Example run_trans_out_2:
-    match (Lambda.parse_lambda "^(\f.\x.f (f x))") with
-    | Some l => interpret_sm (sml_of_lambda l) [] 27
-    | None => None
-    end = Some [2].
-  Proof. auto. Qed.
-
-  Example run_trans_out_f_id_2:
-    match (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") with
-    | Some l => interpret_sm (sml_of_lambda l) [] 42
-    | None => None
-    end = Some [2].
-  Proof. auto. Qed.
-
+  (* Building Library that reads the input *)
   Fixpoint bump_function_ids_by (n : nat) (smp : SMProgram) : SMProgram :=
     match smp with
     | [] => []
     | push m :: smp' => push (m + n) :: (bump_function_ids_by n smp')
     | hd :: smp' => hd :: (bump_function_ids_by n smp')
     end.
-
 
   Definition sm_table_from_program (prog : SMProgram * list SMProgram) 
     : list SMProgram := 
@@ -232,15 +197,71 @@ Module SML.
 
   Definition force_parse_lambda l := match Lambda.parse_lambda l with
     | Some l => l
-    | None => Lambda.var 0 (* Bogus *)
+    | None => Lambda.var 873 (* Bogus *)
     end.
 
-  Definition nil := sml_of_lambda (force_parse_lambda Lambda.EMPTY).
-  Definition cons := sml_of_lambda (force_parse_lambda Lambda.CONS).
-  Definition zero := sml_of_lambda (force_parse_lambda Lambda.ZERO).
-  Definition succ := sml_of_lambda (force_parse_lambda Lambda.SUCC).
+  Definition nil := lambda_to_sml (force_parse_lambda Lambda.EMPTY).
+  Definition cons := lambda_to_sml (force_parse_lambda Lambda.CONS).
+  Definition zero := lambda_to_sml (force_parse_lambda Lambda.ZERO).
+  Definition succ := lambda_to_sml (force_parse_lambda Lambda.SUCC).
 
-  Definition std_lib := make_library [nil; cons; zero; succ].
+  Definition church := 
+    let lib_start := 3 in
+    let lib := map (bump_function_ids_by lib_start) (make_library [zero; succ]) in  
+    ([push 0; call],
+    [[push 1; push 2; get 2; cond_get 2 1; del 2; del 2; del 2; call];
+    [del 0; push lib_start];
+    [dec; push 0; call; push (lib_start + 1); call]] ++ lib).
 
+  Definition list_encoding := 
+    let lib_start := 3 in
+    let lib := map (bump_function_ids_by lib_start) (make_library [church; nil; cons]) in
+    ([push 0; call],
+    [[push 2;push 1;read;cond_get 2 1;del 2; del 2; call];
+    [push lib_start; call; push 0; call;get 1;del 2;push (lib_start + 2);call;call];
+    [del 0; push (lib_start + 1)]] ++ lib).
+
+  Definition _start (main : SMProgram * list SMProgram) :=
+    ([push 0;call;push 1;call], make_library [list_encoding; main]).
+
+  (* This is the core routine that compiles from lambda calculus and injects
+  the input handling code for the SML runtime *)
+  Definition compile_lambda_to_sml (l: Lambda.Lambda): (SMProgram * list SMProgram) :=
+    _start (lambda_to_sml l).
+
+  (* SML Interpreter *)
+  Definition exec_init (main: SMProgram) (fn_table: list SMProgram) (input : list nat) : SMState :=
+    running main [] fn_table Stack.snil input [].
+
+  Definition interpret_sm (prog: SMProgram * list SMProgram) (input : list nat) (fuel: nat):
+    option (list nat) :=
+    let (main, fn_table) := prog in
+    match Utils.run sm_step (exec_init main fn_table input) fuel with
+    | halted output => Some output
+    | _ => None
+    end.
+
+  (* Examples *)
+  Example push_simple:
+    interpret_sm ([push 3; out], []) [] 20 = Some [3].
+  Proof. auto. Qed.
+
+  Example call_simple:
+    interpret_sm ([push 0; out; call; push 2; out], [[push 3; out]]) [] 9 = Some [0; 3; 2].
+  Proof. auto. Qed.
+
+  Example run_trans_out_2:
+    match (Lambda.parse_lambda "^(\f.\x.f (f x))") with
+    | Some l => interpret_sm (lambda_to_sml l) [] 27
+    | None => None
+    end = Some [2].
+  Proof. auto. Qed.
+
+  Example run_trans_out_f_id_2:
+    match (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") with
+    | Some l => interpret_sm (lambda_to_sml l) [] 42
+    | None => None
+    end = Some [2].
+  Proof. auto. Qed.
 
 End SML.
