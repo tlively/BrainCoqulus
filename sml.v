@@ -249,19 +249,16 @@ Module SML.
   Example call_simple:
     interpret_sm ([push 0; out; call; push 2; out], [[push 3; out]]) [] 9 = Some [0; 3; 2].
   Proof. auto. Qed.
+  Eval compute in Lambda.parse_lambda "^(\f.\x.f (f x))".
 
   Example run_trans_out_2:
-    match (Lambda.parse_lambda "^(\f.\x.f (f x))") with
-    | Some l => interpret_sm (lambda_to_sml l) [] 27
-    | None => None
-    end = Some [2].
+    (Lambda.parse_lambda "^(\f.\x.f (f x))") >>= 
+      (fun l => interpret_sm (lambda_to_sml l) [] 30) = Some [2].
   Proof. auto. Qed.
 
   Example run_trans_out_f_id_2:
-    match (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") with
-    | Some l => interpret_sm (lambda_to_sml l) [] 42
-    | None => None
-    end = Some [2].
+    (Lambda.parse_lambda "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))") >>=
+    (fun l => interpret_sm (lambda_to_sml l) [] 42) = Some [2].
   Proof. auto. Qed.
 
 End SML.
