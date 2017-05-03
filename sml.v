@@ -136,14 +136,16 @@ Module SML.
   Inductive Ctx :=
   | ctx (smp: SMProgram) (fn_table: list SMProgram) (n_args stack_size: nat).
 
-  Function lambda_to_sml_helper (l: Lambda.Lambda) (c: Ctx): Ctx :=
+  Definition inc_fid := 1.
+
+  Function lambda_to_sml (l: Lambda.Lambda) (c: Ctx): Ctx :=
     match c with
     | ctx smp fn_table n_args stack_size =>
       match l with
       | Lambda.var n =>
         ctx (smp ++ [get (stack_size - n - 1)]) fn_table n_args (S stack_size)
       | Lambda.lam e =>
-        match lambda_to_sml_helper e (ctx [] fn_table (S n_args) (S n_args)) with
+        match lambda_to_sml e (ctx [] fn_table (S n_args) (S n_args)) with
         | ctx body fn_table' _ stack_size' =>
           (* remove arguments at end of body, leaving only return val *)
           let body := body ++ (repeat (del 1) (S n_args)) in
@@ -154,33 +156,33 @@ Module SML.
           ctx smp (fn_table' ++ [body]) n_args (S stack_size)
         end
       | Lambda.app e1 e2 =>
-        match lambda_to_sml_helper e1 (lambda_to_sml_helper e2 c) with
+        match lambda_to_sml e1 (lambda_to_sml e2 c) with
         | ctx smp fn_table' _ stack_size' =>
           ctx (smp ++ [call]) fn_table' n_args (pred stack_size')
         end
       | Lambda.out e =>
-        match lambda_to_sml_helper e c with
+        match lambda_to_sml e c with
         | ctx smp fn_table' _ stack_size' =>
-          let smp := smp ++ [push 0; push 0; get 2; call; call; out; del 0] in
+          let smp :=
+              smp ++ [push 0; push inc_fid; get 2; call; call; out; del 0] in
           ctx smp fn_table' n_args stack_size'
         end
       end
     end.
 
-  (* Start context with a placeholder for !add. Assume input
-     list already on stack *)
-  Definition lambda_to_sml (l: Lambda.Lambda): (SMProgram * list SMProgram) :=
-    match lambda_to_sml_helper l (ctx [] [] 0 0) with
-    | ctx smp fn_table _ _ => (smp , fn_table)
+  (* Compile lambda to SML without the runtime *)
+  Definition lambda_to_sml_fns (l: Lambda.Lambda): list SMProgram :=
+    match lambda_to_sml l (ctx [] [] 0 0) with
+    | ctx _ fn_table _ _ => fn_table
     end.
 
-  Example app_correct: snd (lambda_to_sml
-                              (Lambda.lam
-                                 (Lambda.app
-                                    (Lambda.app
-                                       (Lambda.var 0)
-                                       (Lambda.lam (Lambda.var 0)))
-                                    (Lambda.lam (Lambda.var 0))))) =
+  Example app_correct: lambda_to_sml_fns
+                         (Lambda.lam
+                            (Lambda.app
+                               (Lambda.app
+                                  (Lambda.var 0)
+                                  (Lambda.lam (Lambda.var 0)))
+                               (Lambda.lam (Lambda.var 0)))) =
                        [[get 1; del 1; del 1];
                           [get 1; del 1; del 1];
                           [get 0; push 0; pack 2; get 1; push 1; pack 2;
@@ -193,60 +195,69 @@ Module SML.
   Fixpoint bump_function_ids_by (n : nat) (smp : SMProgram) : SMProgram :=
     match smp with
     | [] => []
+    | push 0 :: smp' => push 0 :: (bump_function_ids_by n smp')
     | push m :: smp' => push (m + n) :: (bump_function_ids_by n smp')
     | hd :: smp' => hd :: (bump_function_ids_by n smp')
     end.
 
-  Definition sm_table_from_program (prog: SMProgram * list SMProgram)
-    : list SMProgram :=
-    let (smp, fn_table) := prog in
-    smp :: (map (bump_function_ids_by 1) fn_table).
+  Definition lib_weight (progs: list (list SMProgram)): nat :=
+    List.length progs.
 
-  Fixpoint make_library (progs: list (SMProgram * list SMProgram)):
-    list SMProgram :=
+  Function make_library (progs: list (list SMProgram))
+           {measure lib_weight progs}: list SMProgram :=
     match progs with
     | [] => []
-    | (body, table) :: tl =>
-      let new_lib := map (bump_function_ids_by 1) (make_library tl) in
-      let new_body :=
-          bump_function_ids_by (List.length (body :: new_lib)) body in
-      new_body :: new_lib ++
-               (map (bump_function_ids_by (List.length (body :: new_lib)))
-                    table)
+    | table :: tl =>
+      table ++ (make_library
+                  (map (map (bump_function_ids_by (List.length table))) tl))
     end.
+  Proof.
+    intros; unfold lib_weight; rewrite map_length; simpl; omega.
+  Defined.
 
-  Definition nil := lambda_to_sml (Lambda.parse_def Lambda.EMPTY).
-  Definition cons := lambda_to_sml (Lambda.parse_def Lambda.CONS).
-  Definition zero := lambda_to_sml (Lambda.parse_def Lambda.ZERO).
-  Definition succ := lambda_to_sml (Lambda.parse_def Lambda.SUCC).
-
-  Definition church :=
-    let lib_start := 3 in
-    let lib := map (bump_function_ids_by lib_start) (make_library [zero; succ]) in
-    ([push 0; call],
-    [[push 1; push 2; get 2; cond_get 2 1; del 2; del 2; del 2; call];
-    [del 0; push lib_start];
-    [dec; push 0; call; push (lib_start + 1); call]] ++ lib).
-
-  Eval compute in church.
-  Definition list_encoding :=
-    let lib_start := 3 in
-    let lib := map (bump_function_ids_by lib_start)
-                   (make_library [church; nil; cons]) in
-    ([push 0; call],
-     [[push 2; push 1; read; cond_get 2 1; del 2; del 2; call];
-        [push lib_start; call; push 0; call; get 1; del 2;
-           push (lib_start + 2); call; call];
-        [del 0; push (lib_start + 1)]] ++ lib).
-
-  Definition _start (main : SMProgram * list SMProgram) :=
-    ([push 0; call; push 1; call], make_library [list_encoding; main]).
+  Definition runtime_lib: list SMProgram :=
+    let inc_fns := [[inc]] in
+    let nil_fns := lambda_to_sml_fns (Lambda.parse_def Lambda.EMPTY) in
+    let cons_fns := lambda_to_sml_fns (Lambda.parse_def Lambda.CONS) in
+    let zero_fns := lambda_to_sml_fns (Lambda.parse_def Lambda.ZERO) in
+    let succ_fns := lambda_to_sml_fns (Lambda.parse_def Lambda.SUCC) in
+    let lib := make_library [[[]]; inc_fns; nil_fns] in
+    let nil_fid := List.length lib - 1 in
+    let lib := make_library [lib; cons_fns] in
+    let cons_fid := List.length lib - 1 in
+    let lib := make_library [lib; zero_fns] in
+    let zero_fid := List.length lib - 1 in
+    let lib := make_library [lib; succ_fns] in
+    let succ_fid := List.length lib - 1 in
+    let church_fns :=
+        let start := List.length lib in
+        (* ret_zero [n] *)
+        [[del 0; push zero_fid];
+           (* do_church_work [n] *)
+           [dec; push (start + 2); call; push succ_fid; call];
+           (* church [n] *)
+           [push (start + 0); push (start + 1); get 2; cond_get 2 1;
+              del 1; del 1; del 1; call]] in
+    let lib := lib ++ church_fns in
+    let church_fid := List.length lib - 1 in
+    let enc_list_fns :=
+        let start := List.length lib in
+        (* ret_nil [n] *)
+        [[del 0; push nil_fid];
+           (* do_list_enc_work [n] *)
+           [push (start + 2); call; get 1; del 2; push cons_fid; call; call];
+           (* list_enc [] *)
+           [push (start + 0); push (start + 1); read; cond_get 2 1;
+              del 2; del 2; call]] in
+    lib ++ enc_list_fns.
 
   (* This is the core routine that compiles from lambda calculus and injects
-  the input handling code for the SML runtime *)
-  Definition compile_lambda_to_sml (l: Lambda.Lambda):
-    (SMProgram * list SMProgram) :=
-    _start (lambda_to_sml l).
+     the input handling code for the SML runtime *)
+  Definition sml_of_lambda (l: Lambda.Lambda): (SMProgram * list SMProgram) :=
+    let read_list_fid := List.length runtime_lib - 1 in
+    match lambda_to_sml l (ctx [push read_list_fid; call] runtime_lib 0 1) with
+    | ctx smp fn_table _ _ => (smp ++ [call], fn_table)
+    end.
 
   (* SML Interpreter *)
   Definition exec_init (main: SMProgram) (fn_table: list SMProgram)
@@ -270,11 +281,10 @@ Module SML.
     interpret_sm ([push 0; out; call; push 2; out],
                   [[push 3; out]]) [] 9 = Some [0; 3; 2].
   Proof. auto. Qed.
-  Eval compute in Lambda.parse_lambda "^(\f.\x.f (f x))".
 
   Definition parse_lambda_and_compile (lambda_prog : string) :=
     (Lambda.parse_lambda lambda_prog)
-      >>= (fun l => Some (compile_lambda_to_sml l)).
+      >>= (fun l => Some (sml_of_lambda l)).
 
   Definition compile_and_interpret (lambda_prog: string) (input: list nat)
              (f: nat): option (list nat) :=
@@ -282,15 +292,13 @@ Module SML.
       >>= (fun l => interpret_sm l input f).
 
   Example run_trans_out_2:
-    compile_and_interpret "^(\f.\x.f (f x))" [] 50 = Some [2].
-  Proof.
-    unfold compile_and_interpret. simpl. unfold Utils.bind. auto.
-  Abort.
+    compile_and_interpret "\_.^(\f.\x.f (f x))" [] 50 = Some [2].
+  Proof. auto. Qed.
 
   Example run_trans_out_f_id_2:
-    compile_and_interpret "^((\x.\y.y) (\x.x) (\f.\x.f (f x)))" [] 42 =
+    compile_and_interpret "\_.^((\x.\y.y) (\x.x) (\f.\x.f (f x)))" [] 69 =
     Some [2].
-  Proof. auto. Abort.
+  Proof. auto. Qed.
 
   Function nats_of_string (str: string): list nat :=
     match str with
@@ -311,11 +319,40 @@ Module SML.
     | Some ns => string_of_nats ns
     end.
 
+  Definition echo_head := Lambda.parse_def "\l.^(l (\x.\y.y) (\x.\y.x))".
+  Eval compute in sml_of_lambda echo_head.
   Example run_trans_with_input_1:
-    (Lambda.parse_lambda Lambda.lambda_echo)
-      >>= (fun l => Some (interpret_readable
-                            (compile_lambda_to_sml l) ("Hello"%string) 30))
-    = Some "Hello"%string.
-  Proof. auto. Abort.
+    interpret_sm (sml_of_lambda echo_head) [5] 100
+    = Some [5].
+  Proof.
+    replace (sml_of_lambda echo_head) with
+     ([push 22; call; push 27; pack 1; call],
+       [[]; [inc]; [get 1; del 1; del 1]; [get 1; del 1; del 1; del 1];
+       [get 1; get 1; push 3; pack 3; del 1; del 1];
+       [get 0; push 0; pack 2; get 1; push 4; pack 2; get 2; call; call; del 1];
+       [get 1; get 1; get 5; call; call; del 1; del 1; del 1; del 1];
+       [get 4; del 1; del 1; del 1; del 1; del 1];
+       [get 3; get 3; get 3; get 3; push 7; pack 5; del 1; del 1; del 1; del 1];
+       [get 2; get 2; get 2; push 0; pack 4; get 3; get 3;
+       get 3; push 8; pack 4; get 4; call; call; del 1;
+       del 1; del 1]; [get 1; get 1; push 9; pack 3; del 1; del 1];
+       [get 0; push 10; pack 2; del 1]; [get 1; del 1; del 1];
+       [get 0; push 0; pack 2; del 1];
+       [get 2; get 2; get 2; call; call; get 2; call; del 1; del 1; del 1];
+       [get 1; get 1; push 0; pack 3; del 1; del 1];
+       [get 0; push 15; pack 2; del 1]; [del 0; push 13];
+       [dec; push 19; call; push 16; call];
+       [push 17; push 18; get 2; cond_get 2 1; del 1; del 1; del 1; call];
+       [del 0; push 5]; [push 22; call; get 1; del 2; push 11; call; call];
+       [push 20; push 21; read; cond_get 2 1; del 2; del 2; call];
+       [get 1; del 1; del 1; del 1]; [get 1; get 1; push 23; pack 3; del 1; del 1];
+       [get 2; del 1; del 1; del 1]; [get 1; get 1; push 25; pack 3; del 1; del 1];
+       [get 0; push 24; pack 2; get 1; push 26; pack 2;
+       get 2; call; call; push 0; push 1; get 2; call; call; out;
+       del 0; del 1]]) by auto.
+    Set Printing Depth 300.
+    unfold interpret_sm, Utils.run.
+    (* DEBUG ME *)
+    Abort.
 
 End SML.

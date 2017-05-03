@@ -52,6 +52,31 @@ Module JSML.
     induction s; simpl in *; try omega.
   Defined.
 
+    Function stack_call (s: Stack) (fn_table: list SMProgram)
+           {measure Stack.stack_weight s}: (option Stack) * SMProgram  :=
+    match Stack.stack_unpack s with
+    | None => (None, [])
+    | Some stack =>
+      match stack with
+      | Stack.snil => (None, [])
+      | Stack.stuple t s' => stack_call stack fn_table
+      | Stack.snat fid s' =>
+        match nth_error fn_table fid with
+        | None => (None, [])
+        | Some fn => (Some s', fn)
+        end
+      end
+    end.
+  Proof.
+    intros.
+    destruct s; simpl in *; try discriminate.
+    assert (Stack.stack_append s1 s2 = Stack.stuple t s') by congruence.
+    functional inversion H; subst; simpl in *; try omega.
+    clear H teq.
+    induction s; simpl in *; try omega.
+  Defined.
+
+
   Function stack_implicit_jump (s : Stack) (fn_table : list JSMProgram) :=
     match Stack.stack_postfix 1 s with
     | None => (None, [])
@@ -59,7 +84,7 @@ Module JSML.
     | Some (Stack.stuple _ _) => (None, [])
     | Some (Stack.snat fid _) =>
       match Stack.stack_del 1 s with
-      | Some s' => 
+      | Some s' =>
         match nth_error fn_table fid with
         | None => (None, [])
         | Some smf => (Stack.stack_unpack s', smf)
@@ -166,7 +191,7 @@ Module JSML.
     | [] => ([], calls)
   end.
 
-  Function jsm_of_sm' (fn_table : list SML.SMProgram) (start : list JSMProgram) 
+  Function jsm_of_sm' (fn_table : list SML.SMProgram) (start : list JSMProgram)
            (calls : list JSMProgram) (n : nat) : (list JSMProgram) :=
     match fn_table with
     | [] => start ++ calls
@@ -175,12 +200,12 @@ Module JSML.
        | (jsmp, calls') => jsm_of_sm' tl (start ++ [jsmp]) calls' n
        end
     end.
-    
+
   Function jsm_of_sm (sm : SML.SMProgram * list SML.SMProgram) : (JSMProgram * list JSMProgram) :=
     match sm with
     | (main, fn_table) =>
       match jsmp_of_smp main (List.length fn_table) [] with
-      | (main', calls') => 
+      | (main', calls') =>
           (main', jsm_of_sm' fn_table [] calls' (List.length fn_table))
       end
     end.
