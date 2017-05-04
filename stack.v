@@ -107,6 +107,13 @@ Module Stack.
     | snat _ _ => Some s
     | stuple t s => Some (stack_append t s)
     end.
+    
+  Function stack_cond_get (stack : Stack) (n : nat) (k : nat) :=
+    match stack with
+    | Stack.snat 0 _ => Stack.stack_get n stack
+    | Stack.snat _ _ => Stack.stack_get k stack
+    | _ => None
+    end.
 
   Function stack_weight (s: Stack): nat :=
     match s with

@@ -91,18 +91,9 @@ Module SML.
         | None => error
         end
       | cond_get n k :: smp' =>
-        match stack with
-        | Stack.snat 0 _ =>
-          match Stack.stack_get n stack with
-          | Some stack' => running smp' rets fn_table stack' input output
-          | None => error
-          end
-        | Stack.snat _ _ =>
-          match Stack.stack_get k stack with
-          | Some stack' => running smp' rets fn_table stack' input output
-          | None => error
-          end
-        | _ => error
+        match Stack.stack_cond_get stack n k with
+        | Some stack' => running smp' rets fn_table stack' input output
+        | None => error
         end
       | call :: smp' =>
         match stack_call stack fn_table with

@@ -12,8 +12,10 @@ Module JSML.
   | get (n: nat)
   | pack (n: nat)
   | unpack
-  | jump
+  | cond_get (n k: nat)
   | inc
+  | dec
+  | read
   | out.
 
   Definition JSMProgram := list JSMCommand.
@@ -23,6 +25,7 @@ Module JSML.
     | running (smp: JSMProgram)
           (fn_table: list JSMProgram)
           (stack: Stack)
+          (input : list nat)
           (output: list nat)
     | halted (output: list nat)
     | error.
@@ -36,6 +39,7 @@ Module JSML.
       match stack with
       | Stack.snil => (None, [])
       | Stack.stuple t s' => stack_jump stack fn_table
+      | Stack.snat 0 _ => (None, [])
       | Stack.snat fid s' =>
         match nth_error fn_table fid with
         | None => (None, [])
@@ -51,110 +55,81 @@ Module JSML.
     clear H teq.
     induction s; simpl in *; try omega.
   Defined.
-
-    Function stack_call (s: Stack) (fn_table: list SMProgram)
-           {measure Stack.stack_weight s}: (option Stack) * SMProgram  :=
-    match Stack.stack_unpack s with
-    | None => (None, [])
-    | Some stack =>
-      match stack with
-      | Stack.snil => (None, [])
-      | Stack.stuple t s' => stack_call stack fn_table
-      | Stack.snat fid s' =>
-        match nth_error fn_table fid with
-        | None => (None, [])
-        | Some fn => (Some s', fn)
-        end
-      end
-    end.
-  Proof.
-    intros.
-    destruct s; simpl in *; try discriminate.
-    assert (Stack.stack_append s1 s2 = Stack.stuple t s') by congruence.
-    functional inversion H; subst; simpl in *; try omega.
-    clear H teq.
-    induction s; simpl in *; try omega.
-  Defined.
-
-
-  Function stack_implicit_jump (s : Stack) (fn_table : list JSMProgram) :=
-    match Stack.stack_postfix 1 s with
-    | None => (None, [])
-    | Some (Stack.snil) => (None, [])
-    | Some (Stack.stuple _ _) => (None, [])
-    | Some (Stack.snat fid _) =>
-      match Stack.stack_del 1 s with
-      | Some s' =>
-        match nth_error fn_table fid with
-        | None => (None, [])
-        | Some smf => (Stack.stack_unpack s', smf)
-        end
-      | None => (None, [])
-      end
-    end.
 
   Function jsm_step (s: JSMState): JSMState :=
     match s with
     | halted _ | error => s
-    | running smp fn_table stack output =>
+    | running smp fn_table stack input output =>
       match smp with
       | [] =>
-        match stack_implicit_jump stack fn_table with
-        | (Some stack', smf) => running smf fn_table stack' output
-        | (None, _) => halted output
-        end
+        match stack_jump stack fn_table with
+        | (Some stack', smf) => running smf fn_table stack' input output
+        | (None, _) => error 
+        end 
       | push n :: smp' =>
-        running smp' fn_table (Stack.snat n stack) output
+        running smp' fn_table (Stack.snat n stack) input output
       | del n :: smp' =>
         match Stack.stack_del n stack with
-        | Some stack' => running smp' fn_table stack' output
+        | Some stack' => running smp' fn_table stack' input output
         | None => error
         end
       | get n :: smp' =>
         match Stack.stack_get n stack with
-        | Some stack' => running smp' fn_table stack' output
+        | Some stack' => running smp' fn_table stack' input output
         | None => error
         end
       | pack n :: smp' =>
         match Stack.stack_pack n stack with
-        | Some stack' => running smp' fn_table stack' output
+        | Some stack' => running smp' fn_table stack' input output
         | None => error
         end
       | unpack :: smp' =>
         match Stack.stack_unpack stack with
-        | Some stack' => running smp' fn_table stack' output
+        | Some stack' => running smp' fn_table stack' input output
+        | None => error
+        end
+      | cond_get n k :: smp' =>
+        match Stack.stack_cond_get stack n k with
+        | Some stack' => running smp' fn_table stack' input output
         | None => error
         end
       | inc :: smp' =>
         match Stack.stack_inc stack with
-        | Some stack' => running smp' fn_table stack' output
+        | Some stack' => running smp' fn_table stack' input output
         | None => error
+        end
+      | dec :: smp' =>
+        match Stack.stack_dec stack with
+        | Some stack' => running smp' fn_table stack' input output
+        | None => error
+        end
+      | read :: smp' =>
+        match input with
+        | [] =>  running smp' fn_table (Stack.snat 0 stack) [] output
+        | a :: tl => running smp' fn_table (Stack.snat a stack) tl output
         end
       | out :: smp' =>
         match Stack.stack_out stack with
-        | Some a => running smp' fn_table stack (output ++ [a])
+        | Some a => running smp' fn_table stack input (output ++ [a])
         | None => error
-        end
-      | jump :: smp' =>
-        match stack_jump stack fn_table with
-        | (Some stack', smf) => running smf fn_table stack' output
-        | (None, _) => error
         end
       end
     end.
 
-  Definition exec_init (main: JSMProgram) (fn_table: list JSMProgram) : JSMState :=
-    running main fn_table Stack.snil [].
+  Definition exec_init (main: JSMProgram) (fn_table: list JSMProgram) 
+            (input : list nat) : JSMState :=
+    running main fn_table Stack.snil input [].
 
-  Definition interpret_jsm (prog: JSMProgram * list JSMProgram) (fuel: nat):
-    option (list nat) :=
+  Definition interpret_jsm (prog: JSMProgram * list JSMProgram) 
+             (input : list nat)(fuel: nat) : option (list nat) :=
     let (main, fn_table) := prog in
-    match Utils.run jsm_step (exec_init main fn_table) fuel with
+    match Utils.run jsm_step (exec_init main fn_table input) fuel with
     | halted output => Some output
     | _ => None
     end.
 
-  Function jsmp_of_smp (smp : SML.SMProgram) (len : nat) (calls : list JSMProgram) : (JSMProgram * list JSMProgram) :=
+  Function jsmp_of_smp (smp : SML.SMProgram) (len : nat) 
+          (calls : list JSMProgram) : (JSMProgram * list JSMProgram) :=
     match smp with
     | SML.push n :: smp' =>
       match jsmp_of_smp smp' len calls with
@@ -176,6 +151,10 @@ Module JSML.
       match jsmp_of_smp smp' len calls with
       | (jsmp, calls) => (unpack :: jsmp, calls)
       end
+    | SML.cond_get n k :: smp' =>
+      match jsmp_of_smp smp' len calls with
+      | (jsmp, calls) => (cond_get n k :: jsmp, calls)
+      end
     | SML.out :: smp' =>
       match jsmp_of_smp smp' len calls with
       | (jsmp, calls) => (out :: jsmp, calls)
@@ -184,14 +163,22 @@ Module JSML.
       match jsmp_of_smp smp' len calls with
       | (jsmp, calls) => (inc :: jsmp, calls)
       end
+    | SML.dec :: smp' =>
+      match jsmp_of_smp smp' len calls with
+      | (jsmp, calls) => (dec :: jsmp, calls)
+      end
+    | SML.read :: smp' =>
+      match jsmp_of_smp smp' len calls with
+      | (jsmp, calls) => (read :: jsmp, calls)
+      end
     | SML.call :: smp' =>
       match jsmp_of_smp smp' len calls with
-      | (jsmp, calls) => ([push (len + List.length calls); get 1; del 2; jump], calls ++ [jsmp])
+      | (jsmp, calls) => ([push (len + List.length calls); get 1; del 2], calls ++ [jsmp])
       end
     | [] => ([], calls)
   end.
 
-  Function jsm_of_sm' (fn_table : list SML.SMProgram) (start : list JSMProgram)
+  Function jsm_of_sm' (fn_table : list SML.SMProgram) (start : list JSMProgram) 
            (calls : list JSMProgram) (n : nat) : (list JSMProgram) :=
     match fn_table with
     | [] => start ++ calls
@@ -200,20 +187,20 @@ Module JSML.
        | (jsmp, calls') => jsm_of_sm' tl (start ++ [jsmp]) calls' n
        end
     end.
-
+    
   Function jsm_of_sm (sm : SML.SMProgram * list SML.SMProgram) : (JSMProgram * list JSMProgram) :=
     match sm with
     | (main, fn_table) =>
       match jsmp_of_smp main (List.length fn_table) [] with
-      | (main', calls') =>
+      | (main', calls') => 
           (main', jsm_of_sm' fn_table [] calls' (List.length fn_table))
       end
     end.
 
   Theorem jsml_of_sml_correct :
   forall (sm : SML.SMProgram * list SML.SMProgram) (input output: list nat),
-      (exists fuel, SML.interpret_sm sm fuel = Some output) ->
-      (exists fuel, interpret_jsm (jsm_of_sm sm) fuel = Some output).
+      (exists fuel, SML.interpret_sm sm input fuel = Some output) ->
+      (exists fuel, interpret_jsm (jsm_of_sm sm) input fuel = Some output).
   Proof.
     intros.
     destruct H as [fuel]; exists fuel.
@@ -221,29 +208,5 @@ Module JSML.
     unfold interpret_jsm, SML.interpret_sm.
     (* finish proof... *)
   Admitted.
-
-  Eval compute in interpret_jsm (jsm_of_sm ([SML.push 0; SML.out; SML.call; SML.push 2; SML.out], [[SML.push 3; SML.out]])) 50.
-  Example call_simple:
-    interpret_jsm (jsm_of_sm ([SML.push 0; SML.out; SML.call; SML.push 2; SML.out], [[SML.push 3; SML.out]])) 50 = Some [0; 3; 2].
-  Proof. auto. Qed.
-
-  (* NOT USEFUL: I was doing the wrong direction. Keeping it here just because...
-  Function smp_of_jsmp (jsmp : JSMProgram) : SML.SMProgram :=
-    match jsmp with
-    | push n :: jsmp' => SML.push n :: (smp_of_jsmp jsmp')
-    | del n :: jsmp' => SML.del n :: (smp_of_jsmp jsmp')
-    | get n :: jsmp' => SML.get n :: (smp_of_jsmp jsmp')
-    | pack n :: jsmp' => SML.pack n :: (smp_of_jsmp jsmp')
-    | unpack :: jsmp' => SML.unpack :: (smp_of_jsmp jsmp')
-    | out :: jsmp' => SML.out :: (smp_of_jsmp jsmp')
-    | inc :: jsmp' => SML.inc :: (smp_of_jsmp jsmp')
-    | [] => [SML.call]
-    end.
-
-  Function sm_of_jsm (jsmp : JSMProgram * list JSMProgram) : SML.SMProgram * list SML.SMProgram :=
-    match jsmp with
-    | (main, fn_table) => (smp_of_jsmp main, List.map smp_of_jsmp fn_table)
-    end.
-  *)
 
 End JSML.
