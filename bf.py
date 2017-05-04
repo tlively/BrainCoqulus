@@ -82,9 +82,10 @@ class BFMachine:
         print self.ptr, self.tape
         print 'Halted' if self.halted else 'Not halted'
 
-    def run_program(self, program, fuel):
-        self.bootstrap()
+    def run_code(self, program, fuel):
+        self.halted = False
         self.program = program
+        self.program_counter = 0
 
         for i in range(fuel):
             self.step()
@@ -96,9 +97,26 @@ class BFMachine:
         # Never halted but got out of fuel
         return
 
+
+prev = '<<<[<<<]'
+next = '>>>[>>>]'
 zero_cell = '[-]'
-scc = zero_cell + '>[-<+>]<'
+scc_right = zero_cell + '>[-<+>]<'
+scc_left = zero_cell + '<[->+<]>'
+zero_kell = zero_cell + '>' + zero_cell + '>' + zero_cell + '<<'
+copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
+
+def scc_right_n(n): return (n-1) * '>' + n * (scc_right + '<') + '>'
+shift_kell = 3 * (scc_right_n(3) + '>') + '<<<'
+sik = shift_kell + '>>>>>>[<<<' + shift_kell + '>>>>>>]<<<' + prev
+shift_item = next + '<<<[' + sik + '<<<]' + sik
+
+def push(n): return '>>>+>' + n * '+' + '>>'
+def delete(n): return (n + 1) * prev + n * (shift_item + next) # + zero_item
 
 bfm = BFMachine()
-bfm.run_program('>+++<' + scc, 100)
+bfm.bootstrap()
+bfm.run_code(push(3) + push(4), 100)
+bfm.print_state()
+bfm.run_code(prev + shift_kell + '<<<' + shift_kell, 1500)
 bfm.print_state()
