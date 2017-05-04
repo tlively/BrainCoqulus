@@ -121,7 +121,7 @@ Module JSML.
     running main fn_table Stack.snil input [].
 
   Definition interpret_jsm (prog: JSMProgram * list JSMProgram)
-             (input: list nat)(fuel: nat): option (list nat) :=
+             (input: list nat) (fuel: nat): option (list nat) :=
     let (main, fn_table) := prog in
     match Utils.run jsm_step (exec_init main fn_table input) fuel with
     | halted output => Some output
