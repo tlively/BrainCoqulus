@@ -25,8 +25,8 @@ Module SML.
   Definition Stack := Stack.Stack.
 
   Function stack_call (s: Stack) (fn_table: list SMProgram)
-           {measure Stack.stack_weight s}: (option Stack) * SMProgram  :=
-    match Stack.stack_unpack s with
+           {measure Stack.weight s}: (option Stack) * SMProgram  :=
+    match Stack.unpack s with
     | None => (None, [])
     | Some stack =>
       match stack with
@@ -42,7 +42,7 @@ Module SML.
   Proof.
     intros.
     destruct s; simpl in *; try discriminate.
-    assert (Stack.stack_append s1 s2 = Stack.stuple t s') by congruence.
+    assert (Stack.append s1 s2 = Stack.stuple t s') by congruence.
     functional inversion H; subst; simpl in *; try omega.
     clear H teq.
     induction s; simpl in *; try omega.
@@ -71,27 +71,27 @@ Module SML.
       | push n :: smp' =>
         running smp' rets fn_table (Stack.snat n stack) input output
       | del n :: smp' =>
-        match Stack.stack_del n stack with
+        match Stack.del n stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | get n :: smp' =>
-        match Stack.stack_get n stack with
+        match Stack.get n stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | pack n :: smp' =>
-        match Stack.stack_pack n stack with
+        match Stack.pack n stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | unpack :: smp' =>
-        match Stack.stack_unpack stack with
+        match Stack.unpack stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | cond_get n k :: smp' =>
-        match Stack.stack_cond_get stack n k with
+        match Stack.cond_get stack n k with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
@@ -102,12 +102,12 @@ Module SML.
         | (None, _) => error
         end
       | inc :: smp' =>
-        match Stack.stack_inc stack with
+        match Stack.inc stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
       | dec :: smp' =>
-        match Stack.stack_dec stack with
+        match Stack.dec stack with
         | Some stack' => running smp' rets fn_table stack' input output
         | None => error
         end
@@ -117,7 +117,7 @@ Module SML.
         | a :: tl => running smp' rets fn_table (Stack.snat a stack) tl output
         end
       | out :: smp' =>
-        match Stack.stack_out stack with
+        match Stack.out stack with
         | Some a => running smp' rets fn_table stack input (output ++ [a])
         | None => error
         end
@@ -345,5 +345,4 @@ Module SML.
     unfold interpret_sm, Utils.run.
     (* DEBUG ME *)
     Abort.
-
 End SML.
