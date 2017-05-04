@@ -310,6 +310,7 @@ Module SML.
     | Some ns => string_of_nats ns
     end.
 
+  (*
   Definition echo_head := Lambda.parse_def "\l.^(l (\x.\y.y) (\x.\y.x))".
   Eval compute in sml_of_lambda echo_head.
   Example run_trans_with_input_1:
@@ -345,4 +346,5 @@ Module SML.
     unfold interpret_sm, Utils.run.
     (* DEBUG ME *)
     Abort.
+    *)
 End SML.
