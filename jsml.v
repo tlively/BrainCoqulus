@@ -64,8 +64,8 @@ Module JSML.
       | [] =>
         match stack_jump stack fn_table with
         | (Some stack', smf) => running smf fn_table stack' input output
-        | (None, _) => error
-        end
+        | (None, _) => error 
+        end 
       | push n :: smp' =>
         running smp' fn_table (Stack.snat n stack) input output
       | del n :: smp' =>
@@ -116,11 +116,11 @@ Module JSML.
       end
     end.
 
-  Definition exec_init (main: JSMProgram) (fn_table: list JSMProgram)
+  Definition exec_init (main: JSMProgram) (fn_table: list JSMProgram) 
             (input : list nat) : JSMState :=
     running main fn_table Stack.snil input [].
 
-  Definition interpret_jsm (prog: JSMProgram * list JSMProgram)
+  Definition interpret_jsm (prog: JSMProgram * list JSMProgram) 
              (input : list nat)(fuel: nat) : option (list nat) :=
     let (main, fn_table) := prog in
     match Utils.run jsm_step (exec_init main fn_table input) fuel with
@@ -143,19 +143,19 @@ Module JSML.
     | SML.out => out
     end.
 
-  Function jsmp_of_smp (smp : SML.SMProgram) (len : nat)
+  Function jsmp_of_smp (smp : SML.SMProgram) (len : nat) 
           (calls : list JSMProgram) : (JSMProgram * list JSMProgram) :=
     match smp with
     | [] => ([], calls)
     | SML.call :: smp' =>
       let (jsmp, calls) := jsmp_of_smp smp' len calls in
       ([push (len + List.length calls); get 1; del 2], calls ++ [jsmp])
-    | smc :: smp' =>
+    | smc :: smp' => 
       let (jsmp, calls) := jsmp_of_smp smp' len calls in
       (jsmc_of_smc smc :: jsmp, calls)
   end.
 
-  Function jsm_table_of_sm_table (fn_table : list SML.SMProgram) (start : list JSMProgram)
+  Function jsm_table_of_sm_table (fn_table : list SML.SMProgram) (start : list JSMProgram) 
            (calls : list JSMProgram) (n : nat) : (list JSMProgram) :=
     match fn_table with
     | [] => start ++ calls
@@ -163,7 +163,7 @@ Module JSML.
        let (jsmp, calls') := jsmp_of_smp smp n calls in
        jsm_table_of_sm_table tl (start ++ [jsmp]) calls' n
     end.
-
+    
   Function jsm_of_sm (sm : SML.SMProgram * list SML.SMProgram) : (JSMProgram * list JSMProgram) :=
     let (main, fn_table) := sm in
     let (main', calls') := jsmp_of_smp main (List.length fn_table) [] in
@@ -180,7 +180,7 @@ Module JSML.
     rewrite <- H; clear H.
     unfold interpret_jsm, SML.interpret_sm.
     (* finish proof... *)
-  Admitted.
+  Admitted. 
   *)
 
 End JSML.
