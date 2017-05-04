@@ -96,6 +96,9 @@ class BFMachine:
         # Never halted but got out of fuel
         return
 
+zero_cell = '[-]'
+scc = zero_cell + '>[-<+>]<'
+
 bfm = BFMachine()
-bfm.run_program('>>>+++[-]+', 100)
+bfm.run_program('>+++<' + scc, 100)
 bfm.print_state()
