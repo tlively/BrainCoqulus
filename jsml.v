@@ -6,7 +6,7 @@ Import ListNotations.
 Load sml.
 
 Module JSML.
-  Inductive JSMCommand : Set :=
+  Inductive JSMCommand: Set :=
   | push (n: nat)
   | del (n: nat)
   | get (n: nat)
@@ -25,7 +25,7 @@ Module JSML.
     | running (smp: JSMProgram)
           (fn_table: list JSMProgram)
           (stack: Stack)
-          (input : list nat)
+          (input: list nat)
           (output: list nat)
     | halted (output: list nat)
     | error.
@@ -117,18 +117,18 @@ Module JSML.
     end.
 
   Definition exec_init (main: JSMProgram) (fn_table: list JSMProgram)
-            (input : list nat) : JSMState :=
+            (input: list nat): JSMState :=
     running main fn_table Stack.snil input [].
 
   Definition interpret_jsm (prog: JSMProgram * list JSMProgram)
-             (input : list nat)(fuel: nat) : option (list nat) :=
+             (input: list nat)(fuel: nat): option (list nat) :=
     let (main, fn_table) := prog in
     match Utils.run jsm_step (exec_init main fn_table input) fuel with
     | halted output => Some output
     | _ => None
     end.
 
-  Function jsmc_of_smc (smc : SML.SMCommand) : JSMCommand :=
+  Function jsmc_of_smc (smc: SML.SMCommand): JSMCommand :=
     match smc with
     | SML.push n => push n
     | SML.get n => get n
@@ -143,8 +143,8 @@ Module JSML.
     | SML.out => out
     end.
 
-  Function jsmp_of_smp (smp : SML.SMProgram) (len : nat)
-          (calls : list JSMProgram) : (JSMProgram * list JSMProgram) :=
+  Function jsmp_of_smp (smp: SML.SMProgram) (len: nat)
+          (calls: list JSMProgram): (JSMProgram * list JSMProgram) :=
     match smp with
     | [] => ([], calls)
     | SML.call :: smp' =>
@@ -155,8 +155,9 @@ Module JSML.
       (jsmc_of_smc smc :: jsmp, calls)
   end.
 
-  Function jsm_table_of_sm_table (fn_table : list SML.SMProgram) (start : list JSMProgram)
-           (calls : list JSMProgram) (n : nat) : (list JSMProgram) :=
+  Function jsm_table_of_sm_table (fn_table: list SML.SMProgram)
+           (start: list JSMProgram) (calls: list JSMProgram) (n: nat):
+    (list JSMProgram) :=
     match fn_table with
     | [] => start ++ calls
     | smp :: tl =>
@@ -164,14 +165,15 @@ Module JSML.
        jsm_table_of_sm_table tl (start ++ [jsmp]) calls' n
     end.
 
-  Function jsm_of_sm (sm : SML.SMProgram * list SML.SMProgram) : (JSMProgram * list JSMProgram) :=
+  Function jsm_of_sm (sm: SML.SMProgram * list SML.SMProgram):
+    (JSMProgram * list JSMProgram) :=
     let (main, fn_table) := sm in
     let (main', calls') := jsmp_of_smp main (List.length fn_table) [] in
     (main', jsm_table_of_sm_table fn_table [] calls' (List.length fn_table)).
 
   (*
   Theorem jsml_of_sml_correct :
-  forall (sm : SML.SMProgram * list SML.SMProgram) (input output: list nat),
+  forall (sm: SML.SMProgram * list SML.SMProgram) (input output: list nat),
       (exists fuel, SML.interpret_sm sm input fuel = Some output) ->
       (exists fuel, interpret_jsm (jsm_of_sm sm) input fuel = Some output).
   Proof.
