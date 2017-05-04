@@ -1,9 +1,10 @@
+KELL_SIZE = 4
 class BFMachine:
     def __init__(self):
         self.bootstrap()
 
     def bootstrap(self):
-        self.tape = [0 for _ in range(45)]
+        self.tape = [0 for _ in range(10 * KELL_SIZE)]
         self.ptr = 0
         self.program_counter = 0
         self.output = []
@@ -79,12 +80,12 @@ class BFMachine:
         if rest_of_program == '':
             rest_of_program = 'Empty Program'
         print self.program_counter, rest_of_program
-        print self.ptr
+        print 'Cell ', self.ptr, 'Kell ', self.ptr / KELL_SIZE
         i = 0
         s = ''
         while i < len(self.tape):
-            s += '(' + str(self.tape[i]) + ',' + str(self.tape[i+1]) + ',' + str(self.tape[i+2]) + ')' + ' '
-            i += 3
+            s += '(' + ','.join(map(str, self.tape[i:i+KELL_SIZE])) + ') '
+            i += KELL_SIZE
         print s
         print 'Halted' + str(self.output) if self.halted else 'Not halted'
 
@@ -103,16 +104,19 @@ class BFMachine:
         # Never halted but got out of fuel
         return
 
-KELL_SIZE = 3
+KELL_SIZE = 4
 kl = KELL_SIZE * '<'
 kr = KELL_SIZE * '>'
+
+next_nonzero = (KELL_SIZE - 2) * '>'
+def write_scratch(n): return (KELL_SIZE - 1) * '>' + n * '+' + (KELL_SIZE - 1) * '<'
 
 prev = kl + '[' + kl + ']'
 next = kr + '[' + kr + ']'
 zero_cell = '[-]'
 scc_right = zero_cell + '>[-<+>]<'
 scc_left = zero_cell + '<[->+<]>'
-zero_kell = KELL_SIZE * (zero_cell + '>') + kl
+zero_kell = KELL_SIZE * (zero_cell + '>') + '<<+' + (KELL_SIZE - 2) * '<'
 copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
 zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
 
@@ -149,7 +153,7 @@ bfm = BFMachine()
 bfm.bootstrap()
 bfm.run_code(push(3) + push(4) + push(5), 100)
 bfm.run_code(3 * prev, 1500)
-bfm.run_code('>>+++++<<', 1500)
+bfm.run_code(write_scratch(5), 1500)
 bfm.print_state()
 bfm.run_code(deref, 1500)
 bfm.print_state()
