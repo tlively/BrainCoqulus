@@ -97,26 +97,32 @@ class BFMachine:
         # Never halted but got out of fuel
         return
 
+KELL_SIZE = 3
+kl = KELL_SIZE * '<'
+kr = KELL_SIZE * '>'
 
-prev = '<<<[<<<]'
-next = '>>>[>>>]'
+prev = kl + '[' + kl + ']'
+next = kr + '[' + kr + ']'
 zero_cell = '[-]'
 scc_right = zero_cell + '>[-<+>]<'
 scc_left = zero_cell + '<[->+<]>'
-zero_kell = zero_cell + '>' + zero_cell + '>' + zero_cell + '<<'
-copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
+zero_kell = KELL_SIZE * (zero_cell + '>') + kl
+#copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
+zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
 
-def scc_right_n(n): return (n-1) * '>' + n * (scc_right + '<') + '>'
-shift_kell = 3 * (scc_right_n(3) + '>') + '<<<'
-sik = shift_kell + '>>>>>>[<<<' + shift_kell + '>>>>>>]<<<' + prev
-shift_item = next + '<<<[' + sik + '<<<]' + sik
+def scc_right_n(n): return (n) * '>' + n * ('<' + scc_right)
+shift_kell = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + kl
+sik = shift_kell + 2 * kr + '[' + kl + shift_kell + 2 * kr + ']' + kl + '+' + prev
+shift_item = next + kl + '[' + sik + kl + ']' + sik
 
-def push(n): return '>>>+>' + n * '+' + '>>'
-def delete(n): return (n + 1) * prev + n * (shift_item + next) # + zero_item
+def push(n): return kr + '+>' + n * '+' + (KELL_SIZE - 1) * '>'
+def delete(n): return (n + 1) * prev + n * (shift_item + next) + zero_item
 
 bfm = BFMachine()
 bfm.bootstrap()
-bfm.run_code(push(3) + push(4), 100)
+bfm.run_code(push(3) + push(4) + push(5), 100)
 bfm.print_state()
-bfm.run_code(prev + shift_kell + '<<<' + shift_kell, 1500)
+bfm.run_code(3 * prev, 1500)
+bfm.print_state()
+bfm.run_code(shift_item, 1500)
 bfm.print_state()
