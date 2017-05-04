@@ -3,7 +3,7 @@ class BFMachine:
         self.bootstrap()
 
     def bootstrap(self):
-        self.tape = [0 for _ in range(30)]
+        self.tape = [0 for _ in range(45)]
         self.ptr = 0
         self.program_counter = 0
         self.output = []
@@ -79,8 +79,14 @@ class BFMachine:
         if rest_of_program == '':
             rest_of_program = 'Empty Program'
         print self.program_counter, rest_of_program
-        print self.ptr, self.tape
-        print 'Halted' if self.halted else 'Not halted'
+        print self.ptr
+        i = 0
+        s = ''
+        while i < len(self.tape):
+            s += '(' + str(self.tape[i]) + ',' + str(self.tape[i+1]) + ',' + str(self.tape[i+2]) + ')' + ' '
+            i += 3
+        print s
+        print 'Halted' + str(self.output) if self.halted else 'Not halted'
 
     def run_code(self, program, fuel):
         self.halted = False
@@ -118,11 +124,53 @@ shift_item = next + kl + '[' + sik + kl + ']' + sik
 def push(n): return kr + '+>' + n * '+' + (KELL_SIZE - 1) * '>'
 def delete(n): return (n + 1) * prev + n * (shift_item + next) + zero_item
 
+# assumes 'nonzero' and 'zero' will leave me in the same place; cleans up temps.
+def if_else(nonzero, zero):
+    return '>>[-]+>>>[-]<<<<<' + '[' + nonzero + '>>-<<[>>>>>+<<<<<-]]' + '>>>>>[<<<<<+>>>>>-]<<<[<<' + zero + '>>-]'
+
+# assumes 'nonzero'/'zero' will take me to a 0, and does not clean up any temps used.
+# unpack can only work this way...
+def garbage_if_else(nonzero, zero):
+    return '>>[-]+>>>[-]<<<<<' + '[' + nonzero + ']' + '>>>>>[<<<<<+>>>>>-]<<<[<<' + zero + '>>]<<'
+
+
+# CODE FOR PACK/UNPACK + TESTS
+unpack = prev + '>>>-' + garbage_if_else('>>>[->>>]', '+' + next)
+
+def pack(n):
+    return prev * n + '>>>' + ('+>>>[+>>>]') * n
+
 bfm = BFMachine()
-bfm.bootstrap()
-bfm.run_code(push(3) + push(4) + push(5), 100)
+# bfm.bootstrap()
+# bfm.run_code(push(3) + push(4) + push(5), 100)
+# bfm.print_state()
+# bfm.run_code(3 * prev, 1500)
+# bfm.print_state()
+# bfm.run_code(shift_item, 1500)
+
+# set up a stack with a tuple
+# bfm.run_code('>>>' + '++>+++++>>' + '+>>>' + '++>+++++++>>', 100)
+# bfm.print_state()
+# bfm.run_code(unpack, 100)
+# bfm.print_state()
+# bfm.run_code(unpack, 100)
+# bfm.print_state()
+# bfm.run_code(unpack, 100)
+# bfm.print_state()
+# bfm.run_code(unpack, 100)
+# bfm.print_state()
+
+# set up stack with numbers
+bfm.run_code('>>>' + '+>+>>' + '>>>' '+>+++++++++>>' + '>>>' '+>+++++>>' + '>>>' + '+>+++++++>>' + '>>>' + '+>++>>', 100)
+
 bfm.print_state()
-bfm.run_code(3 * prev, 1500)
+bfm.run_code(pack(3), 100)
 bfm.print_state()
-bfm.run_code(shift_item, 1500)
+bfm.run_code(pack(2), 100)
+bfm.print_state()
+bfm.run_code(unpack, 100)
+bfm.print_state()
+bfm.run_code(unpack, 100)
+bfm.print_state()
+bfm.run_code(unpack, 300)
 bfm.print_state()
