@@ -186,7 +186,6 @@ Module SML.
   Fixpoint bump_function_ids_by (n : nat) (smp : SMProgram) : SMProgram :=
     match smp with
     | [] => []
-    | push 0 :: smp' => push 0 :: (bump_function_ids_by n smp')
     | push m :: smp' => push (m + n) :: (bump_function_ids_by n smp')
     | hd :: smp' => hd :: (bump_function_ids_by n smp')
     end.
@@ -236,11 +235,15 @@ Module SML.
         (* ret_nil [n] *)
         [[del 0; push nil_fid];
            (* do_list_enc_work [n] *)
-           [push (start + 2); call; get 1; del 2; push cons_fid; call; call];
+           [push (start + 2); call; get 1; del 2; push church_fid; call;
+              push cons_fid; call; call];
            (* list_enc [] *)
            [push (start + 0); push (start + 1); read; cond_get 2 1;
               del 2; del 2; call]] in
     lib ++ enc_list_fns.
+
+  Lemma inc_fid_correct: nth_error runtime_lib inc_fid = Some [inc].
+  Proof. auto. Qed.
 
   (* This is the core routine that compiles from lambda calculus and injects
      the input handling code for the SML runtime *)
@@ -254,6 +257,11 @@ Module SML.
   Definition exec_init (main: SMProgram) (fn_table: list SMProgram)
              (input: list nat): SMState :=
     running main [] fn_table Stack.snil input [].
+
+  Definition debug_sm (prog: SMProgram * list SMProgram) (input: list nat)
+             (fuel: nat): SMState :=
+    let (main, fn_table) := prog in
+    Utils.run sm_step (exec_init main fn_table input) fuel.
 
   Definition interpret_sm (prog: SMProgram * list SMProgram) (input: list nat)
              (fuel: nat): option (list nat) :=
@@ -291,60 +299,12 @@ Module SML.
     Some [2].
   Proof. auto. Qed.
 
-  Function nats_of_string (str: string): list nat :=
-    match str with
-    | EmptyString => []
-    | String a str' => nat_of_ascii a :: (nats_of_string str')
-    end.
-
-  Function string_of_nats (ns: list nat): string :=
-    match ns with
-    | [] => EmptyString
-    | n :: ns' => String (ascii_of_nat n) (string_of_nats ns')
-    end.
-
-  Function interpret_readable (prog: SMProgram * list SMProgram) (input: string)
-           (f: nat): string :=
-    match interpret_sm prog (nats_of_string input) f with
-    | None => EmptyString
-    | Some ns => string_of_nats ns
-    end.
-
-  (*
-  Definition echo_head := Lambda.parse_def "\l.^(l (\x.\y.y) (\x.\y.x))".
-  Eval compute in sml_of_lambda echo_head.
   Example run_trans_with_input_1:
-    interpret_sm (sml_of_lambda echo_head) [5] 100
-    = Some [5].
-  Proof.
-    replace (sml_of_lambda echo_head) with
-     ([push 22; call; push 27; pack 1; call],
-       [[]; [inc]; [get 1; del 1; del 1]; [get 1; del 1; del 1; del 1];
-       [get 1; get 1; push 3; pack 3; del 1; del 1];
-       [get 0; push 0; pack 2; get 1; push 4; pack 2; get 2; call; call; del 1];
-       [get 1; get 1; get 5; call; call; del 1; del 1; del 1; del 1];
-       [get 4; del 1; del 1; del 1; del 1; del 1];
-       [get 3; get 3; get 3; get 3; push 7; pack 5; del 1; del 1; del 1; del 1];
-       [get 2; get 2; get 2; push 0; pack 4; get 3; get 3;
-       get 3; push 8; pack 4; get 4; call; call; del 1;
-       del 1; del 1]; [get 1; get 1; push 9; pack 3; del 1; del 1];
-       [get 0; push 10; pack 2; del 1]; [get 1; del 1; del 1];
-       [get 0; push 0; pack 2; del 1];
-       [get 2; get 2; get 2; call; call; get 2; call; del 1; del 1; del 1];
-       [get 1; get 1; push 0; pack 3; del 1; del 1];
-       [get 0; push 15; pack 2; del 1]; [del 0; push 13];
-       [dec; push 19; call; push 16; call];
-       [push 17; push 18; get 2; cond_get 2 1; del 1; del 1; del 1; call];
-       [del 0; push 5]; [push 22; call; get 1; del 2; push 11; call; call];
-       [push 20; push 21; read; cond_get 2 1; del 2; del 2; call];
-       [get 1; del 1; del 1; del 1]; [get 1; get 1; push 23; pack 3; del 1; del 1];
-       [get 2; del 1; del 1; del 1]; [get 1; get 1; push 25; pack 3; del 1; del 1];
-       [get 0; push 24; pack 2; get 1; push 26; pack 2;
-       get 2; call; call; push 0; push 1; get 2; call; call; out;
-       del 0; del 1]]) by auto.
-    Set Printing Depth 300.
-    unfold interpret_sm, Utils.run.
-    (* DEBUG ME *)
-    Abort.
-    *)
+    compile_and_interpret "\l.^(l (\x.\y.y) (\x.\y.x))" [5] 337 = Some [5].
+  Proof. auto. Qed.
+
+  Example run_trans_echo:
+    compile_and_interpret Lambda.lambda_echo [1;2;3] 1673 = Some([1;2;3]).
+  Proof. auto. Qed.
+
 End SML.
