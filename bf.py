@@ -113,13 +113,17 @@ zero_cell = '[-]'
 scc_right = zero_cell + '>[-<+>]<'
 scc_left = zero_cell + '<[->+<]>'
 zero_kell = KELL_SIZE * (zero_cell + '>') + kl
-#copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
+copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
 zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
 
 def scc_right_n(n): return (n) * '>' + n * ('<' + scc_right)
 shift_kell = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + kl
 sik = shift_kell + 2 * kr + '[' + kl + shift_kell + 2 * kr + ']' + kl + '+' + prev
+cik = copy_kell + 2 * kr + '[' + kl + copy_kell + 2 * kr + ']' + kl + copy_kell + prev
 shift_item = next + kl + '[' + sik + kl + ']' + sik
+shift_scratch_left = kl + '[-' + kr + '+' + kl + ']' + kr
+deref = (KELL_SIZE - 1) * '>' + '[' + kr + shift_scratch_left + '-]' + (KELL_SIZE - 1) * '<'
+
 
 def push(n): return kr + '+>' + n * '+' + (KELL_SIZE - 1) * '>'
 def delete(n): return (n + 1) * prev + n * (shift_item + next) + zero_item
@@ -139,38 +143,13 @@ unpack = prev + '>>>-' + garbage_if_else('>>>[->>>]', '+' + next)
 
 def pack(n):
     return prev * n + '>>>' + ('+>>>[+>>>]') * n
+stack_top = kr + '[[' + kr + ']' + kr + ']' + kl
 
 bfm = BFMachine()
-# bfm.bootstrap()
-# bfm.run_code(push(3) + push(4) + push(5), 100)
-# bfm.print_state()
-# bfm.run_code(3 * prev, 1500)
-# bfm.print_state()
-# bfm.run_code(shift_item, 1500)
-
-# set up a stack with a tuple
-# bfm.run_code('>>>' + '++>+++++>>' + '+>>>' + '++>+++++++>>', 100)
-# bfm.print_state()
-# bfm.run_code(unpack, 100)
-# bfm.print_state()
-# bfm.run_code(unpack, 100)
-# bfm.print_state()
-# bfm.run_code(unpack, 100)
-# bfm.print_state()
-# bfm.run_code(unpack, 100)
-# bfm.print_state()
-
-# set up stack with numbers
-bfm.run_code('>>>' + '+>+>>' + '>>>' '+>+++++++++>>' + '>>>' '+>+++++>>' + '>>>' + '+>+++++++>>' + '>>>' + '+>++>>', 100)
-
+bfm.bootstrap()
+bfm.run_code(push(3) + push(4) + push(5), 100)
+bfm.run_code(3 * prev, 1500)
+bfm.run_code('>>+++++<<', 1500)
 bfm.print_state()
-bfm.run_code(pack(3), 100)
-bfm.print_state()
-bfm.run_code(pack(2), 100)
-bfm.print_state()
-bfm.run_code(unpack, 100)
-bfm.print_state()
-bfm.run_code(unpack, 100)
-bfm.print_state()
-bfm.run_code(unpack, 300)
+bfm.run_code(deref, 1500)
 bfm.print_state()
