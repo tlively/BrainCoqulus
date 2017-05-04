@@ -7,6 +7,7 @@ class BFMachine:
         self.ptr = 0
         self.program_counter = 0
         self.output = []
+        self.halted = False
 
 
     def do_left(self):
@@ -54,12 +55,11 @@ class BFMachine:
                 self.program_counter -= 1
             assert (self.program[self.program_counter + 1] == '[')
 
-        if self.tape[self.ptr] == 0:
-            self.do_left()
-            self.do_left()
+        if self.tape[self.ptr] > 0:
+            assert (self.program_counter >= 2)
+            self.program_counter -= 2
             move_left()
-            self.do_right()
-            self.do_right()
+            self.program_counter += 2
 
     def step(self):
         self.program_counter += 1
@@ -75,8 +75,12 @@ class BFMachine:
         }[self.program[self.program_counter - 1]]()
 
     def print_state(self):
-        print self.program_counter, self.program[self.program_counter:]
+        rest_of_program = self.program[self.program_counter:]
+        if rest_of_program == '':
+            rest_of_program = 'Empty Program'
+        print self.program_counter, rest_of_program
         print self.ptr, self.tape
+        print 'Halted' if self.halted else 'Not halted'
 
     def run_program(self, program, fuel):
         self.bootstrap()
@@ -87,10 +91,11 @@ class BFMachine:
 
             # Program halted
             if self.program_counter == len(self.program):
+                self.halted = True
                 return
         # Never halted but got out of fuel
         return
 
 bfm = BFMachine()
-bfm.run_program('>>>+++<+', 100)
+bfm.run_program('>>>+++[-]+', 100)
 bfm.print_state()
