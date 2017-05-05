@@ -4,7 +4,7 @@ class BFMachine:
         self.bootstrap()
 
     def bootstrap(self):
-        self.tape = [0 for _ in range(10 * KELL_SIZE)]
+        self.tape = [0 for _ in range(13 * KELL_SIZE)]
         self.ptr = 0
         self.program_counter = 0
         self.output = []
@@ -111,6 +111,7 @@ kr = KELL_SIZE * '>'
 unmark = (KELL_SIZE - 2) * '>' + '+' + (KELL_SIZE - 2) * '<'
 mark = (KELL_SIZE - 2) * '>' + '-' + (KELL_SIZE - 2) * '<'
 next_marked = (KELL_SIZE - 2) * '>' + kr + '['+ kr + ']' + (KELL_SIZE - 2) * '<'
+prev_marked = (KELL_SIZE - 2) * '>' + kl + '['+ kl + ']' + (KELL_SIZE - 2) * '<'
 def write_scratch(n): return (KELL_SIZE - 1) * '>' + n * '+' + (KELL_SIZE - 1) * '<'
 
 prev = kl + '[' + kl + ']'
@@ -118,9 +119,11 @@ next = kr + '[' + kr + ']'
 zero_cell = '[-]'
 scc_right = zero_cell + '>[-<+>]<'
 scc_left = zero_cell + '<[->+<]>'
-zero_kell = KELL_SIZE * (zero_cell + '>') + '<<+<+' + (KELL_SIZE - 3) * '<'
+zero_kell = KELL_SIZE * (zero_cell + '>') + kl
 copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
-zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
+empty_kell = zero_kell + (KELL_SIZE - 2) * '>' + '+' + (KELL_SIZE - 2) * '<'
+#zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
+empty_item = empty_kell + mark + kr + '[' + empty_kell + kr + ']' + prev_marked + unmark
 
 def scc_right_n(n): return (n) * '>' + n * ('<' + scc_right)
 shift_kell = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + unmark + kl
@@ -133,7 +136,10 @@ deref = (KELL_SIZE - 1) * '>' + '[' + kr + shift_scratch_left + '-]' + (KELL_SIZ
 
 
 def push(n): return unmark + kr + unmark + '+>' + n * '+' + (KELL_SIZE - 1) * '>'
-def delete(n): return (n + 1) * prev + n * (shift_item + next) + zero_item
+def delete(n):
+    if n == 0:
+        return prev + empty_item + mark
+    return (n-1) * (prev + kr + mark + kl) + 2 * prev + shift_item + next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']' + prev_marked
 
 # assumes 'nonzero' and 'zero' will leave me in the same place; cleans up temps.
 def if_else(nonzero, zero):
@@ -154,12 +160,15 @@ stack_top = kr + '[[' + kr + ']' + kr + ']' + kl
 
 
 shove_zero_gap = '<<[' + (KELL_SIZE-2) * '<' + shift_item + '<<]>>' + kl + shift_item
+add_kell = '+>++>+>>'
 
 bfm = BFMachine()
 bfm.bootstrap()
-bfm.run_code(push(3) + push(4) + push(5) + push(6) + '+>++>+>>', 1500)
+bfm.run_code(push(3) + push(4) + push(5) + push(6) +  2 * add_kell, 1500)
 bfm.print_state()
-bfm.run_code(2 * (prev + kr + mark + kl) + 2 * prev + shift_item, 1500)
+bfm.run_code(delete(3), 4500)
 bfm.print_state()
-bfm.run_code(next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']', 4500)
+bfm.run_code(delete(1), 4500)
+bfm.print_state()
+bfm.run_code(delete(0), 4500)
 bfm.print_state()
