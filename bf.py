@@ -120,7 +120,6 @@ zero_cell = '[-]'
 scc_right = zero_cell + '>[-<+>]<'
 scc_left = zero_cell + '<[->+<]>'
 zero_kell = KELL_SIZE * (zero_cell + '>') + kl
-copy_kell = zero_cell + '>' + zero_cell + '>' + scc_right + '[->+<<<+>>]>>>' + scc_left + '[-<+<<<+>>>>]<<<<<'
 empty_kell = zero_kell + (KELL_SIZE - 2) * '>' + '+' + (KELL_SIZE - 2) * '<'
 #zero_item = zero_kell + kr + '[' + zero_kell + kr + ']'
 empty_item = empty_kell + mark + kr + '[' + empty_kell + kr + ']' + prev_marked + unmark
@@ -128,7 +127,6 @@ empty_item = empty_kell + mark + kr + '[' + empty_kell + kr + ']' + prev_marked 
 def scc_right_n(n): return (n) * '>' + n * ('<' + scc_right)
 shift_kell = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + unmark + kl
 sik = shift_kell + 2 * kr + '[' + kl + shift_kell + 2 * kr + ']' + kl + prev
-cik = copy_kell + 2 * kr + '[' + kl + copy_kell + 2 * kr + ']' + kl + copy_kell + prev
 shift_item = next + kl + '[' + sik + kl + ']' + sik
 shift_scratch_left = kl + '[-' + kr + '+' + kl + ']' + kr
 deref = (KELL_SIZE - 1) * '>' + '[' + kr + shift_scratch_left + '-]' + (KELL_SIZE - 1) * '<'
@@ -140,6 +138,8 @@ def delete(n):
     if n == 0:
         return prev + empty_item + mark
     return (n-1) * (prev + kr + mark + kl) + 2 * prev + shift_item + next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']' + prev_marked
+
+
 
 # assumes 'nonzero' and 'zero' will leave me in the same place; cleans up temps.
 def if_else(nonzero, zero):
@@ -162,13 +162,28 @@ stack_top = kr + '[[' + kr + ']' + kr + ']' + kl
 shove_zero_gap = '<<[' + (KELL_SIZE-2) * '<' + shift_item + '<<]>>' + kl + shift_item
 add_kell = '+>++>+>>'
 
+to_scratch = (KELL_SIZE - 1) * '>'
+from_scratch = (KELL_SIZE - 1) * '<'
+def copy_to_scratch(offset):
+    assert (offset < KELL_SIZE - 1)
+    move = (KELL_SIZE - 1 - offset)
+    return offset * '>' + '[-' + move * '>' + '+' + move * '<' + ']' + offset * '<'
+def copy_cell(offset):
+    prog = copy_to_scratch(offset)
+    prog += to_scratch + '[-' + from_scratch + offset * '>' + '+' + offset * '<' + next_marked + offset * '>' + '+' + offset * '<' + prev_marked + to_scratch + ']' + from_scratch
+    return prog
+
+def get(n):
+    prog = unmark + kr + mark + kl + (n+1) * prev + kr + mark
+    prog += '[' + copy_cell(0) + copy_cell(1) + next_marked + unmark + prev_marked + unmark + kr + mark + ']'
+    return prog + next_marked
+
 bfm = BFMachine()
 bfm.bootstrap()
 bfm.run_code(push(3) + push(4) + push(5) + push(6) +  2 * add_kell, 1500)
 bfm.print_state()
 bfm.run_code(delete(3), 4500)
 bfm.print_state()
-bfm.run_code(delete(1), 4500)
+bfm.run_code(get(1), 4500)
 bfm.print_state()
-bfm.run_code(delete(0), 4500)
-bfm.print_state()
+
