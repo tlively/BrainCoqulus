@@ -138,38 +138,21 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     | S m => bfn & repeat m bfn
     end.
   
-  Definition prev :=
-    label "prev" (bfn_left 3 (bfn_loop (bfn_left 3 bfn_end) bfn_end)).
-    
-  Definition next :=
-    label "next" (bfn_right 3 (bfn_loop (bfn_right 3 bfn_end) bfn_end)).
-    
-  Definition zero_cell :=
-    label "zero_cell" (bfn_loop (bfn_dec 1 bfn_end) bfn_end).
-    
-  Definition scc_right :=
-    label "scc_right" zero_cell & (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 (bfn_end))))) 
-    (bfn_left 1 bfn_end))).
-  
-  Definition scc_left :=
-    label "scc_left" zero_cell & (bfn_left 1 (bfn_loop (bfn_dec 1 (bfn_right 1 (bfn_inc 1 (bfn_left 1 bfn_end)))) 
-    (bfn_right 1 bfn_end))).
-    
-  Definition skk := 
-    label "skk" zero_cell & (bfn_right 1 zero_cell) & (bfn_right 1 scc_right) & 
-    (bfn_loop (bfn_dec 1 (bfn_right 1 (bfn_inc 1 (bfn_left 3 (bfn_inc 1 (bfn_right 2 bfn_end)))))) 
-      ((bfn_right 3 scc_left) & 
-    (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_left 3 (bfn_inc 1 (bfn_right 4 bfn_end)))))) 
-      (bfn_left 5 bfn_end)))).
-      
-  Definition sik :=
-    label "sik" (skk & (bfn_right 6 (bfn_loop ((bfn_left 3 skk) & bfn_right 6 bfn_end) (bfn_left 3 prev)))).
+  Definition KELL_SIZE := 4.
+  Definition kl := bfn_left KELL_SIZE bfn_end.
+  Definition kr := bfn_right KELL_SIZE bfn_end.
+  Definition unmark := bfn_right (KELL_SIZE - 2) (bfn_inc 1 (bfn_left (KELL_SIZE -2) bfn_end)). 
+  Definition mark := bfn_right (KELL_SIZE - 2) (bfn_loop (bfn_dec 1 bfn_end) (bfn_left (KELL_SIZE -2) bfn_end)). 
+  Definition next_marked := (bfn_right (KELL_SIZE - 2) kr) & (bfn_loop kr (bfn_left (KELL_SIZE - 2) bfn_end)).
+  Definition prev_marked := bfn_right (KELL_SIZE - 2) kl & bfn_loop kl (bfn_left (KELL_SIZE - 2) bfn_end).
+  Definition prev := kl & bfn_loop kl bfn_end.
+  Definition next := kr & bfn_loop kr bfn_end.
+Definition copy_cell (offset:nat):BFN :=
+    copy_to_scratch(offset) & to_scratch & (bfn_loop (bfn_dec 1 from_scratch & bfn_right offset bfn) from_scratch).
 
-  Definition shift_item :=
-    label "shift_item" next & (bfn_left 3 (bfn_loop (sik & bfn_left 3 bfn_end) sik)).
+  Definition get (n:nat):BFN :=
+    unmark & kr & mark & kl & (repeat (n+1) prev) & kr & mark & (bfn_loop ((copy_cell 0) & (copy_cell 1) & next_marked & unmark & prev_marked & unmark & kr & (mark bfn_end)) next_marked).
     
-  Definition zero_item :=
-    label "zero_item" (bfn_right 2 (zero_cell & (bfn_right 1 zero_cell) & (bfn_left 3 bfn_end))).
 
   (* JSML -> BFN. Stub. *)
   Function bfn_of_jsm (main : JSML.JSMProgram) :=
