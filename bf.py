@@ -87,7 +87,7 @@ class BFMachine:
             s += '(' + ','.join(map(str, self.tape[i:i+KELL_SIZE])) + ') '
             i += KELL_SIZE
         print s
-        print 'Halted' + str(self.output) if self.halted else 'Not halted'
+        print 'Halted' + str(self.output) if self.halted else 'Not halted ' + str(self.output)
 
     def run_code(self, program, fuel):
         self.halted = False
@@ -140,8 +140,10 @@ def delete(n):
     return (n-1) * (prev + kr + mark + kl) + 2 * prev + shift_item + next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']' + prev_marked + stack_top
 
 
-to_scratch = '>>>'
-from_scratch = '<<<'
+to_scratch = (KELL_SIZE - 1) * '>'
+from_scratch = (KELL_SIZE - 1) * '<'
+to_scratch_val = (KELL_SIZE - 2) * '>'
+from_scratch_val = (KELL_SIZE - 2) * '<'
 
 # assumes 'nonzero' and 'zero' will leave me in the same place; cleans up temps.
 def if_else(nonzero, zero):
@@ -151,6 +153,13 @@ def if_else(nonzero, zero):
 # unpack can only work this way...
 def garbage_if_else(nonzero, zero):
     return to_scratch + '[-]+' + kr + '[-]' + kl + from_scratch + '[' + nonzero + ']' + to_scratch + kr + '[' + from_scratch + kl + '+' + to_scratch + kr + '-]' + kl + '[' + from_scratch + zero + to_scratch + ']' + from_scratch
+
+def if_else_val(nonzero, zero):
+    return to_scratch_val + '[-]+' + kr + '[-]' + kl + from_scratch_val + '[' + nonzero + to_scratch_val + '-' + from_scratch_val + '[' + to_scratch_val + kr + '+' + kl + from_scratch_val + '-]]' + to_scratch_val + kr + '[' + from_scratch_val + kl + '+' + to_scratch_val + kr + '-]' + kl + '[' + from_scratch_val + zero + to_scratch_val + '-]'
+
+def garbage_if_else_val(nonzero, zero):
+    return to_scratch_val + '[-]+' + kr + '[-]' + kl + from_scratch_val + '[' + nonzero + ']' + to_scratch_val + kr + '[' + from_scratch_val + kl + '+' + to_scratch_val + kr + '-]' + kl + '[' + from_scratch_val + zero + to_scratch_val + ']' + from_scratch_val
+
 
 # CODE FOR PACK/UNPACK + TESTS
 unpack = prev + kr + '-' + garbage_if_else(kr + '[-' + kr + ']', '+' + next)
@@ -186,25 +195,39 @@ cond_get = prev + kr + '>' + garbage_if_else('<' + stack_top, '<' + stack_top + 
 
 bfm = BFMachine()
 bfm.bootstrap()
-bfm.run_code(push(7) + push(3) + push(4) + push(0), 1500)
-bfm.print_state()
+# bfm.run_code(push(7) + push(3) + push(4) + push(0), 1500)
+# bfm.print_state()
 
+unpack_until_nat = kl + '-' + '[+' + kr + unpack + kl + '-]+' + kr
+
+# main & [unpack until number left?] & prev > [ - garbage_if_else (/* non zero */ garbage_if_else (end) (< stack_top & delete 0 & f2 >)) (/* zero */ f1) ]
+
+out = kl + '>.<' + kr
+inc = kl + '>+<' + kr
+dec = kl + '>-<' + kr
+read = kl + '>,<' + kr
+
+main = push(0) + push(0) + push(1) + push(0) + push(2) + out
+# prog = unpack_until_nat + kl + '>[-' + garbage_if_else(garbage_if_else('', '<' + kr + delete(0) + out), '<' + kr + delete(0) + inc * 3 + out) + unpack_until_nat + kl + '>]'
+prog_simpl = unpack_until_nat + kl + '>[-' + garbage_if_else_val('-' + garbage_if_else_val('-' + stack_top, '<' + kr + delete(0) + inc * 5 + out + delete(0) + stack_top), '<' + kr + delete(0) + inc * 3 + out + delete(0) + stack_top) + unpack_until_nat + kl + '>]'
+# prog_very_simpl = unpack_until_nat + kl + '>'
 # bfm.run_code(get(1), 1500)
 # bfm.print_state()
 
-# bfm.run_code(pack(2), 200)
-# bfm.print_state()
-# bfm.run_code(pack(3), 200)
-# bfm.print_state()
-# bfm.run_code(unpack, 200)
-# bfm.print_state()
-# bfm.run_code(unpack, 200)
-# bfm.print_state()
-# bfm.run_code(unpack, 200)
-# bfm.print_state()
-
+bfm.run_code(main, 4000)
 bfm.print_state()
-bfm.run_code(cond_get, 4500)
+bfm.run_code(prog_simpl, 5000)
 bfm.print_state()
+# bfm.run_code(unpack_until_nat + kl + '>', 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
 
-
+# bfm.run_code(delete(3), 4500)
+# bfm.print_state()
+# bfm.run_code(cond_get, 4500)
+# bfm.print_state()
