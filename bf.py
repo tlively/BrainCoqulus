@@ -109,7 +109,7 @@ kr = KELL_SIZE * '>'
 
 #set_zero = (KELL_SIZE - 3) * '>' + '+' + (KELL_SIZE - 2) * '<'
 unmark = (KELL_SIZE - 2) * '>' + '+' + (KELL_SIZE - 2) * '<'
-mark = (KELL_SIZE - 2) * '>' + '-' + (KELL_SIZE - 2) * '<'
+mark = (KELL_SIZE - 2) * '>' + '[-]' + (KELL_SIZE - 2) * '<'
 next_marked = (KELL_SIZE - 2) * '>' + kr + '['+ kr + ']' + (KELL_SIZE - 2) * '<'
 prev_marked = (KELL_SIZE - 2) * '>' + kl + '['+ kl + ']' + (KELL_SIZE - 2) * '<'
 def write_scratch(n): return (KELL_SIZE - 1) * '>' + n * '+' + (KELL_SIZE - 1) * '<'
@@ -203,7 +203,8 @@ bfm.print_state()
 # bfm.run_code(unpack, 200)
 # bfm.print_state()
 
-bfm.run_code(delete(3), 4500)
 bfm.print_state()
 bfm.run_code(cond_get, 4500)
 bfm.print_state()
+
+
