@@ -137,25 +137,27 @@ def push(n): return unmark + kr + unmark + '+>' + n * '+' + (KELL_SIZE - 1) * '>
 def delete(n):
     if n == 0:
         return prev + empty_item + mark
-    return (n-1) * (prev + kr + mark + kl) + 2 * prev + shift_item + next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']' + prev_marked
+    return (n-1) * (prev + kr + mark + kl) + 2 * prev + shift_item + next + mark + next_marked + '[' + kl + shove_zero_gap + kr + unmark + next + mark + next_marked + ']' + prev_marked + stack_top
 
 
+to_scratch = '>>>'
+from_scratch = '<<<'
 
 # assumes 'nonzero' and 'zero' will leave me in the same place; cleans up temps.
 def if_else(nonzero, zero):
-    return '>>[-]+>>>[-]<<<<<' + '[' + nonzero + '>>-<<[>>>>>+<<<<<-]]' + '>>>>>[<<<<<+>>>>>-]<<<[<<' + zero + '>>-]'
+    return to_scratch + '[-]+' + kr + '[-]' + kl + from_scratch + '[' + nonzero + to_scratch + '-' + from_scratch + '[' + to_scratch + kr + '+' + kl + from_scratch + '-]]' + to_scratch + kr + '[' + from_scratch + kl + '+' + to_scratch + kr + '-]' + kl + '[' + from_scratch + zero + to_scratch + '-]'
 
 # assumes 'nonzero'/'zero' will take me to a 0, and does not clean up any temps used.
 # unpack can only work this way...
 def garbage_if_else(nonzero, zero):
-    return '>>[-]+>>>[-]<<<<<' + '[' + nonzero + ']' + '>>>>>[<<<<<+>>>>>-]<<<[<<' + zero + '>>]<<'
-
+    return to_scratch + '[-]+' + kr + '[-]' + kl + from_scratch + '[' + nonzero + ']' + to_scratch + kr + '[' + from_scratch + kl + '+' + to_scratch + kr + '-]' + kl + '[' + from_scratch + zero + to_scratch + ']' + from_scratch
 
 # CODE FOR PACK/UNPACK + TESTS
-unpack = prev + '>>>-' + garbage_if_else('>>>[->>>]', '+' + next)
+unpack = prev + kr + '-' + garbage_if_else(kr + '[-' + kr + ']', '+' + next)
 
 def pack(n):
-    return prev * n + '>>>' + ('+>>>[+>>>]') * n
+    return prev * n + kr + ('+' + kr + '[+' + kr + ']') * n
+
 stack_top = kr + '[[' + kr + ']' + kr + ']' + kl
 
 
@@ -178,12 +180,30 @@ def get(n):
     prog += '[' + copy_cell(0) + copy_cell(1) + next_marked + unmark + prev_marked + unmark + kr + mark + ']'
     return prog + next_marked
 
+# look at the value of the previous item. NOTE: this assumes that the last item
+# is NOT a tuple; it gets the second element on the stack.
+cond_get = prev + kr + '>' + garbage_if_else('<' + stack_top, '<' + stack_top + get(1))
+
 bfm = BFMachine()
 bfm.bootstrap()
-bfm.run_code(push(3) + push(4) + push(5) + push(6) +  2 * add_kell, 1500)
-bfm.print_state()
-bfm.run_code(delete(3), 4500)
-bfm.print_state()
-bfm.run_code(get(1), 4500)
+bfm.run_code(push(7) + push(3) + push(4) + push(0), 1500)
 bfm.print_state()
 
+# bfm.run_code(get(1), 1500)
+# bfm.print_state()
+
+# bfm.run_code(pack(2), 200)
+# bfm.print_state()
+# bfm.run_code(pack(3), 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
+# bfm.run_code(unpack, 200)
+# bfm.print_state()
+
+bfm.run_code(delete(3), 4500)
+bfm.print_state()
+bfm.run_code(cond_get, 4500)
+bfm.print_state()
