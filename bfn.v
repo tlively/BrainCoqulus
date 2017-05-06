@@ -18,7 +18,7 @@ Module BFN.
   | bfn_loop : BFN -> BFN -> BFN  (* [...] *)
   | label : string -> BFN -> BFN
   | assert : (nat -> bool) -> string -> BFN -> BFN.
-  
+
   Inductive BFNState : Type :=
     | running (ast: BFN)
               (resets: list BFN)
@@ -107,7 +107,7 @@ Module BFN.
 
 Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     Utils.run bfn_step (exec_init prog input) fuel.
-    
+
 
   Definition interpret_bfn (prog: BFN) (input: list nat) (fuel: nat): option (list nat) :=
     match Utils.run bfn_step (exec_init prog input) fuel with
@@ -131,18 +131,18 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     end.
 
   Notation "a & f" := (bfn_append a f) (at level 50, left associativity).
-  
+
   Fixpoint repeat (n : nat) (bfn : BFN) : BFN :=
     match n with
     | 0 => bfn_end
     | S m => bfn & (repeat m bfn)
     end.
-  
+
   Definition KELL_SIZE := 4.
   Definition kl := bfn_left KELL_SIZE bfn_end.
   Definition kr := bfn_right KELL_SIZE bfn_end.
-  Definition unmark := bfn_right (KELL_SIZE - 2) (bfn_inc 1 (bfn_left (KELL_SIZE -2) bfn_end)). 
-  Definition mark := bfn_right (KELL_SIZE - 2) (bfn_loop (bfn_dec 1 bfn_end) (bfn_left (KELL_SIZE -2) bfn_end)). 
+  Definition unmark := bfn_right (KELL_SIZE - 2) (bfn_inc 1 (bfn_left (KELL_SIZE -2) bfn_end)).
+  Definition mark := bfn_right (KELL_SIZE - 2) (bfn_loop (bfn_dec 1 bfn_end) (bfn_left (KELL_SIZE -2) bfn_end)).
   Definition next_marked := (bfn_right (KELL_SIZE - 2) kr) & (bfn_loop kr (bfn_left (KELL_SIZE - 2) bfn_end)).
   Definition prev_marked := bfn_right (KELL_SIZE - 2) kl & bfn_loop kl (bfn_left (KELL_SIZE - 2) bfn_end).
   Definition prev := kl & bfn_loop kl bfn_end.
@@ -158,15 +158,15 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
 
   Definition copy_cell (offset:nat):BFN :=
     copy_to_scratch(offset) & to_scratch & (bfn_loop (bfn_dec 1 from_scratch & bfn_right offset bfn_end) from_scratch).
-  
+
   Definition get (n:nat):BFN :=
     unmark & kr & mark & kl & (repeat (n+1) prev) & kr & mark & (bfn_loop ((copy_cell 0) & (copy_cell 1) & next_marked & unmark & prev_marked & unmark & kr & (mark & bfn_end)) next_marked).
-  
-  Definition empty_kell := (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_left 4 (bfn_right 2 (bfn_inc 1 (bfn_left 2 bfn_end)))))))))))).  
+
+  Definition empty_kell := (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_left 4 (bfn_right 2 (bfn_inc 1 (bfn_left 2 bfn_end)))))))))))).
   Definition empty_item :=
     empty_kell & mark & kr & (bfn_loop (empty_kell & kr) (prev_marked & unmark)).
   Definition shift_kell := (bfn_right 4 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 3 (bfn_inc 1 (bfn_left 6 bfn_end))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))).
-  Definition sik := shift_kell & kr & kr & (bfn_loop (kl & shift_kell & kr & kr) (kl & prev)).   
+  Definition sik := shift_kell & kr & kr & (bfn_loop (kl & shift_kell & kr & kr) (kl & prev)).
   Definition shift_item := next & kl & (bfn_loop (sik & kl) sik).
 
   Definition stack_top := kr & (bfn_loop (bfn_loop kr kr) kl).
@@ -184,47 +184,47 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
 
   Definition if_else_val (nonzero zero : BFN) :=
     to_scratch_val & bfn_loop (bfn_dec 1 bfn_end) (bfn_inc 1 kr) & bfn_loop (bfn_dec 1 bfn_end) kl & from_scratch_val & bfn_loop nonzero to_scratch_val & kr & bfn_loop (from_scratch_val & kl & bfn_inc 1 to_scratch_val & kr & bfn_dec 1 bfn_end) kl & bfn_loop (from_scratch_val & zero & to_scratch_val) from_scratch_val.
-  
+
   Definition pack (n : nat) : BFN :=
     ((repeat n prev) & (kr)) & (repeat n ((bfn_inc 1 kr) & (bfn_loop (bfn_inc 1 kr) bfn_end))).
-    
+
   Definition unpack : BFN :=
     prev & kr & bfn_dec 1 (if_else (kr & bfn_loop (bfn_dec 1 kr) bfn_end) (bfn_inc 1 next)).
-    
+
   Definition push (n : nat) : BFN :=
     unmark & kr & unmark & bfn_inc 1 (bfn_right 1 (bfn_inc n (bfn_right (KELL_SIZE - 1) bfn_end))).
-  
+
   Definition out : BFN :=
     kl & bfn_right 1 (bfn_out 1 (bfn_left 1 kr)).
-    
+
   Definition inc : BFN :=
     kl & bfn_right 1 (bfn_inc 1 (bfn_left 1 kr)).
-    
+
   Definition dec : BFN :=
     kl & bfn_right 1 (bfn_dec 1 (bfn_left 1 kr)).
-    
+
   Definition read : BFN :=
     kl & bfn_right 1 (bfn_in 1 (bfn_left 1 kr)).
-   
+
   Definition unpack_until_nat : BFN :=
-    kl & bfn_dec 1 (bfn_loop (bfn_inc 1 kr & unpack & kl & bfn_dec 1 bfn_end) (bfn_inc 1 kr)).
-  
+    kl & bfn_dec 1 (bfn_loop (bfn_inc 1 kr & unpack & kl & bfn_dec 1 bfn_end) (bfn_inc 1 kr)) & stack_top.
+
   Definition cond_get (n k : nat) :=
     kl & bfn_right 1 (if_else_val (stack_top & get k) (stack_top & get n)).
-    
+
   (* Compiles a single JSMProgram to BFN. *)
   Function bfn_of_jsmp (main : JSML.JSMProgram) :=
     match main with
-    | JSML.push n :: jsmp => push n & bfn_of_jsmp jsmp 
-    | JSML.del n :: jsmp => del n & bfn_of_jsmp jsmp
-    | JSML.get n :: jsmp => get n & bfn_of_jsmp jsmp
-    | JSML.pack n :: jsmp => pack n & bfn_of_jsmp jsmp
-    | JSML.unpack :: jsmp => unpack & bfn_of_jsmp jsmp
-    | JSML.cond_get n k :: jsmp => cond_get n k & bfn_of_jsmp jsmp
-    | JSML.inc :: jsmp => inc & bfn_of_jsmp jsmp
-    | JSML.dec :: jsmp => dec & bfn_of_jsmp jsmp
-    | JSML.read :: jsmp => read & bfn_of_jsmp jsmp
-    | JSML.out :: jsmp => out & bfn_of_jsmp jsmp
+    | JSML.push n :: jsmp => label "push" (push n & bfn_of_jsmp jsmp)
+    | JSML.del n :: jsmp => label "del" (del n & bfn_of_jsmp jsmp)
+    | JSML.get n :: jsmp => label "get" (get n & bfn_of_jsmp jsmp)
+    | JSML.pack n :: jsmp => label "pack" (pack n & bfn_of_jsmp jsmp)
+    | JSML.unpack :: jsmp => label "unpack" (unpack & bfn_of_jsmp jsmp)
+    | JSML.cond_get n k :: jsmp => label "cond_get" (cond_get n k & bfn_of_jsmp jsmp)
+    | JSML.inc :: jsmp => label "inc" (inc & bfn_of_jsmp jsmp)
+    | JSML.dec :: jsmp => label "dec" (dec & bfn_of_jsmp jsmp)
+    | JSML.read :: jsmp => label "read" (read & bfn_of_jsmp jsmp)
+    | JSML.out :: jsmp => label "out" (out & bfn_of_jsmp jsmp)
     | [] => bfn_end
     end.
 
@@ -233,18 +233,18 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Function switch (fn_table : list JSML.JSMProgram) :=
     match fn_table with
     | [] => stack_top (* maybe delete argument? *)
-    | hd :: tl => 
-        if_else_val (bfn_dec 1 (switch tl)) 
-        (bfn_left 1 kr & del 0 & bfn_of_jsmp hd & stack_top)
+    | hd :: tl =>
+        if_else_val (bfn_dec 1 (switch tl))
+        (bfn_left 1 stack_top & del 0 & bfn_of_jsmp hd & stack_top)
     end.
-  
+
   (* Compiles the JSM function table to a loop that unpacks the first item on
      the stack, performs a while loop with the function table switch. *)
   Function bfn_of_jsm_table (fn_table : list JSML.JSMProgram) :=
     match fn_table with
     | [] => bfn_end
-    | hd :: tl => 
-        unpack_until_nat & kl & 
+    | hd :: tl =>
+        unpack_until_nat & kl &
         bfn_right 1 (bfn_loop (bfn_dec 1 (switch fn_table))
         (unpack_until_nat & kl & bfn_right 1 bfn_end))
     end.
@@ -253,10 +253,10 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
      table loop (due to jump semantics). *)
   Function bfn_of_jsm (jsm : JSML.JSMProgram * list JSML.JSMProgram) :=
     let (main, fn_table) := jsm in
-    bfn_of_jsmp main & bfn_of_jsm_table fn_table.
+    label "main" (bfn_of_jsmp main) & label "fn_table" (bfn_of_jsm_table fn_table).
 
   (* TESTS *)
-  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 573.
+  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 800.
 
   Example bfn_of_jsmpl_push :
     interpret_bfn (bfn_of_jsmp [JSML.push 2; JSML.push 3; JSML.out]) [] 100 = Some [3].
@@ -267,8 +267,19 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Proof. auto. Qed.
 
   Example bfn_of_jsmp1_del_1 :
-    interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
-  Proof. auto. Qed. 
+    interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 3000 = Some [20].
+  Proof. auto. Qed.
+
+  Definition main_test := [JSML.push 0; JSML.push 0; JSML.push 1; JSML.push 0; JSML.push 2].
+  Definition fn_table_test := [[JSML.inc; JSML.inc; JSML.out; JSML.del 0]; [JSML.inc; JSML.inc; JSML.inc; JSML.inc; JSML.inc; JSML.out; JSML.del 0]].
+
+  Eval compute in (bfn_of_jsm (main_test, fn_table_test)).
+  Eval compute in debug_bfn (bfn_of_jsm (main_test, fn_table_test)) [] 1060.
+
+  (* !!!!!!! *)
+  Example bfn_of_jsm_table_ex1 :
+    interpret_bfn (bfn_of_jsm (main_test, fn_table_test)) [] 1000 = Some [5;2].
+  Proof. auto. Qed.
 
   Example bfn_of_jsmp1_del_1 :
     interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
@@ -283,4 +294,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Example bfn_of_jsmp1 :
     interpret_bfn (bfn_of_jsmp [JSML.push 1]) [] 20 = Some [].
   Proof. simpl. auto. Qed.
+
+
 End BFN.
