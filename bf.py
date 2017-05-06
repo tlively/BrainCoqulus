@@ -104,6 +104,47 @@ class BFMachine:
         # Never halted but got out of fuel
         return
 
+def firstDifferent(s):
+    for i, c in enumerate(s):
+        if c != s[0]:
+            return i
+    return len(s)
+
+def closingBracket(rest):
+    count = 1
+    pc = 0
+    while count > 0:
+        if rest[pc] == '[':
+            count += 1
+        elif rest[pc] == ']':
+            count -= 1
+        pc += 1
+
+    assert (rest[pc-1] == ']')
+    return pc-1
+
+def toCoq(bf_string):
+    if len(bf_string) == 0:
+        return 'bfn_end'
+    split = firstDifferent(bf_string)
+    c, rest = bf_string[0], bf_string[split:]
+    if c == '[':
+        closing = closingBracket(rest)
+        body, end = rest[:closing], rest[closing+1:]
+        return '(bfn_loop {} {})'.format(toCoq(body), toCoq(end))
+
+    bfn_token = {
+        '<': 'bfn_left',
+        '>': 'bfn_right',
+        '+': 'bfn_inc',
+        '-': 'bfn_dec',
+        '.': 'bfn_out',
+        ',': 'bfn_in'
+    }[c]
+    return '({} {} {})'.format(bfn_token, split, toCoq(rest))
+print toCoq('>>>[++<]>>-')
+
+
 kl = KELL_SIZE * '<'
 kr = KELL_SIZE * '>'
 
