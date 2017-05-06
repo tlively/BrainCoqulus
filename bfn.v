@@ -16,8 +16,7 @@ Module BFN.
   | bfn_out : nat -> BFN -> BFN   (* . *)
   | bfn_in : nat -> BFN -> BFN    (* , *)
   | bfn_loop : BFN -> BFN -> BFN  (* [...] *)
-  | label : string -> BFN -> BFN
-  | assert : (nat -> bool) -> string -> BFN -> BFN.
+  | label : string -> BFN -> BFN.
 
   Inductive BFNState : Type :=
     | running (ast: BFN)
@@ -26,8 +25,7 @@ Module BFN.
               (tape: BFTape.Tape)
               (input: list nat)
               (output: list nat)
-    | halted (output: list nat)
-    | error (msg: string).
+    | halted (output: list nat).
 
   Function bfn_weight (bfn: BFN): nat :=
     match bfn with
@@ -40,18 +38,17 @@ Module BFN.
     | bfn_in n bfn' => (S n) + bfn_weight bfn'
     | bfn_loop inner bfn' => S ((bfn_weight inner) + (bfn_weight bfn'))
     | label string bfn' => S (bfn_weight bfn')
-    | assert b string bfn' => S (bfn_weight bfn')
     end.
 
   Function bfn_state_weight (s: BFNState): nat :=
     match s with
     | running bfn _ _ _ _ _ => bfn_weight bfn
-    | halted _ | error _ => 0
+    | halted _ => 0
     end.
 
   Function bfn_step (s: BFNState) {measure bfn_state_weight s}: BFNState :=
     match s with
-    | halted _ | error _ => s
+    | halted _ => s
     | running bfn resets ptr tape input output =>
       match bfn with
       | bfn_end =>
@@ -92,10 +89,6 @@ Module BFN.
         else
           running inner_bfn (bfn :: resets) ptr tape input output
       | label str bfn' => running bfn' resets ptr tape input output
-      | assert truth msg bfn' => match truth ptr with
-         | true => running bfn' resets ptr tape input output
-         | false => error msg
-         end
       end
     end.
   Proof.
@@ -113,7 +106,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     match Utils.run bfn_step (exec_init prog input) fuel with
     | running _ _ _ _ _ _ => None
     | halted output => Some output
-    | error msg => None
     end.
 
   Function bfn_append bfn1 bfn2 :=
@@ -127,7 +119,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     | bfn_in n bfn' => bfn_in n (bfn_append bfn' bfn2)
     | bfn_loop inner bfn' => bfn_loop inner (bfn_append bfn' bfn2)
     | label str bfn' => label str (bfn_append bfn' bfn2)
-    | assert truth str bfn' => assert truth str (bfn_append bfn' bfn2)
     end.
 
   Notation "a & f" := (bfn_append a f) (at level 50, left associativity).
@@ -256,7 +247,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     label "main" (bfn_of_jsmp main) & label "fn_table" (bfn_of_jsm_table fn_table).
 
   (* TESTS *)
-  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 800.
+(*  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 800.
 
   Example bfn_of_jsmpl_push :
     interpret_bfn (bfn_of_jsmp [JSML.push 2; JSML.push 3; JSML.out]) [] 100 = Some [3].
@@ -294,6 +285,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Example bfn_of_jsmp1 :
     interpret_bfn (bfn_of_jsmp [JSML.push 1]) [] 20 = Some [].
   Proof. simpl. auto. Qed.
-
+*)
 
 End BFN.

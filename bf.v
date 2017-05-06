@@ -252,6 +252,7 @@ Module BF.
     | bfn_out (S n) bfn' => bf_out (bf_of_bfn (bfn_out n bfn'))
     | bfn_in (S n) bfn' => bf_in (bf_of_bfn (bfn_in n bfn'))
     | bfn_loop inner bfn' => bf_loop (bf_of_bfn inner) (bf_of_bfn bfn')
+    | label _ bfn' => bf_of_bfn bfn'     
     end.
   Proof.
     all: intros; auto; simpl; omega.
@@ -332,5 +333,11 @@ Module BF.
     destruct result;
       now unfold bf_state_of_bfn_state.
     Qed.
+
+  (* Compiles Lambda calculus to Brainfuck !!! *)
+  Definition bf_of_lambda (l: Lambda.Lambda): BF :=
+    bf_of_bfn (BFN.bfn_of_jsm (JSML.jsm_of_sm (SML.sml_of_lambda l))).
+
+  Eval compute in bf_of_lambda (Lambda.get_lam Lambda.l_id).
 
 End BF.
