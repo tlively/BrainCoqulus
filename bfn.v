@@ -135,7 +135,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Fixpoint repeat (n : nat) (bfn : BFN) : BFN :=
     match n with
     | 0 => bfn_end
-    | S m => bfn & repeat m bfn
+    | S m => bfn & (repeat m bfn)
     end.
   
   Definition KELL_SIZE := 4.
@@ -166,7 +166,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     to_scratch_val & bfn_loop (bfn_dec 1 bfn_end) (bfn_inc 1 kr) & bfn_loop (bfn_dec 1 bfn_end) kl & from_scratch_val & bfn_loop nonzero to_scratch_val & kr & bfn_loop (from_scratch_val & kl & bfn_inc 1 to_scratch_val & kr & bfn_dec 1 bfn_end) kl & bfn_loop (from_scratch_val & zero & to_scratch_val) from_scratch_val.
   
   Definition pack (n : nat) : BFN :=
-    repeat n prev & kr & repeat n (bfn_inc 1 kr & bfn_loop (bfn_inc 1 kr) bfn_end).
+    ((repeat n prev) & (kr)) & (repeat n ((bfn_inc 1 kr) & (bfn_loop (bfn_inc 1 kr) bfn_end))).
     
   Definition unpack : BFN :=
     prev & kr & bfn_dec 1 (if_else (kr & bfn_loop (bfn_dec 1 kr) bfn_end) (bfn_inc 1 next)).
@@ -194,11 +194,14 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     | JSML.inc :: jsmp => inc & bfn_of_jsm jsmp
     | JSML.dec :: jsmp => dec & bfn_of_jsm jsmp
     | JSML.read :: jsmp => read & bfn_of_jsm jsmp
+    | JSML.pack n :: jsmp => pack n & bfn_of_jsm jsmp
+    | JSML.unpack :: jsmp => unpack & bfn_of_jsm jsmp
     | _ => bfn_end
     end.
+  Eval compute in debug_bfn (bfn_of_jsm [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 573.
   
   Example bfn_of_jsml_push :
-    interpret_bfn (bfn_of_jsm [JSML.push 2; JSML.push 3; JSML.pack]) [] 100 = Some [3].
+    interpret_bfn (bfn_of_jsm [JSML.push 2; JSML.push 3; JSML.out]) [] 100 = Some [3].
   Proof. auto. Qed.
   
   Example bfn_of_jsm1_del_0 :
