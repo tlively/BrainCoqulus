@@ -210,7 +210,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     kl & bfn_dec 1 (bfn_loop (bfn_inc 1 kr & unpack & kl & bfn_dec 1 bfn_end) (bfn_inc 1 kr)).
   
   Definition cond_get (n k : nat) :=
-    bfn_end.
+    kl & bfn_right 1 (if_else_val (stack_top & get k) (stack_top & get n)).
     
   (* Compiles a single JSMProgram to BFN. *)
   Function bfn_of_jsmp (main : JSML.JSMProgram) :=
