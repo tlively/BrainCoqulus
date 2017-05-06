@@ -287,4 +287,40 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Proof. simpl. auto. Qed.
 *)
 
+  (* FIXME: I think this is broken right now *)
+  Definition tape_of_stack (stack: Stack.Stack) :=
+    let fix list_of_stack (n: nat) (stack:Stack.Stack) : list nat :=
+      match stack with
+      | Stack.snil => []
+      | Stack.snat hd rest => (list_of_stack n rest) ++ [n;0;1;0;n+1;hd;1;0]
+      | Stack.stuple t rest => (list_of_stack n rest) ++ [n;0;1;0] ++ (list_of_stack (n + 1) t)
+      end
+    in BFTape.tape_of_list (list_of_stack 0 stack).
+ Eval compute in tape_of_stack ((Stack.snat 5 Stack.snil)).
+ Eval compute in tape_of_stack ((Stack.stuple (Stack.snat 5 Stack.snil) Stack.snil)).
+ 
+  Definition bfn_state_of_jsm_state (state: JSML.JSMState): BFNState :=
+    match state with
+    | JSML.halted output => halted output
+    | JSML.running smp fn_table stack input output =>
+      running (bfn_of_jsm (smp, fn_table)) [] ((Stack.weight stack) * KELL_SIZE) (tape_of_stack stack) input output
+    | error => halted []
+    end.
+  Eval compute in bfn_state_of_jsm_state (JSML.running [] [] (Stack.snat 5 Stack.snil) [] []).
+  Eval compute in bfn_state_of_jsm_state (JSML.running [] [] (Stack.stuple (Stack.snat 5 Stack.snil) Stack.snil) [] []).
+  
+  Eval compute in bfn_state_of_jsm_state (JSML.running [] [] (Stack.stuple (Stack.snat 3 (Stack.snat 2 Stack.snil)) (Stack.snat 1 Stack.snil)) [] []).
+  
+  Lemma bfn_of_jsm_correct:
+    forall (jsm: JSML.JSMProgram * list JSML.JSMProgram) (input output: list nat),
+      (exists fuel, JSML.interpret_jsm jsm input fuel = Some output) ->
+      (exists fuel, interpret_bfn (bfn_of_jsm jsm) input fuel = Some output).
+  Proof.
+    intros.
+    destruct H as [fuel]; exists fuel.
+    rewrite <- H; clear H.
+    unfold interpret_bfn, JSML.interpret_jsm.
+    replace (exec_init (bfn_of_jsm jsm) input) with
+    (bfn_state_of_jsm_state (JSML.exec_init jsm input)) by auto.
+
 End BFN.

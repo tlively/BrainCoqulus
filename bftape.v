@@ -26,4 +26,14 @@ Module BFTape.
   Definition dec (tape: Tape) (ptr: nat): Tape :=
     put tape ptr (pred (get tape ptr)).
 
+  Definition tape_of_list (lst : list nat) :Tape :=
+    let fix helper (lst: list nat) : Tape * nat :=
+      match lst with
+      | [] => (empty, 0)
+      | hd :: tl => let (rest, stack_top) := helper tl in
+        (put rest stack_top hd, S stack_top)
+      end
+    in fst (helper (lst)).
+  Eval compute in tape_of_list [1;2;4].
+
 End BFTape.
