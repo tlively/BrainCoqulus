@@ -203,59 +203,75 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Definition cond_get (n k : nat) :=
     bfn_end.
     
-  Function bfn_of_jsm (main : JSML.JSMProgram) :=
+  (* Compiles a single JSMProgram to BFN. *)
+  Function bfn_of_jsmp (main : JSML.JSMProgram) :=
     match main with
-    | JSML.push n :: jsmp => push n & bfn_of_jsm jsmp 
-    | JSML.del n :: jsmp => delete n & bfn_of_jsm jsmp
-    | JSML.get n :: jsmp => get n & bfn_of_jsm jsmp
-    | JSML.pack n :: jsmp => pack n & bfn_of_jsm jsmp
-    | JSML.unpack :: jsmp => unpack & bfn_of_jsm jsmp
-    | JSML.cond_get n k :: jsmp => cond_get n k & bfn_of_jsm jsmp
-    | JSML.inc :: jsmp => inc & bfn_of_jsm jsmp
-    | JSML.dec :: jsmp => dec & bfn_of_jsm jsmp
-    | JSML.read :: jsmp => read & bfn_of_jsm jsmp
-    | JSML.out :: jsmp => out & bfn_of_jsm jsmp
+    | JSML.push n :: jsmp => push n & bfn_of_jsmp jsmp 
+    | JSML.del n :: jsmp => delete n & bfn_of_jsmp jsmp
+    | JSML.get n :: jsmp => get n & bfn_of_jsmp jsmp
+    | JSML.pack n :: jsmp => pack n & bfn_of_jsmp jsmp
+    | JSML.unpack :: jsmp => unpack & bfn_of_jsmp jsmp
+    | JSML.cond_get n k :: jsmp => cond_get n k & bfn_of_jsmp jsmp
+    | JSML.inc :: jsmp => inc & bfn_of_jsmp jsmp
+    | JSML.dec :: jsmp => dec & bfn_of_jsmp jsmp
+    | JSML.read :: jsmp => read & bfn_of_jsmp jsmp
+    | JSML.out :: jsmp => out & bfn_of_jsmp jsmp
     | [] => bfn_end
     end.
 
+  (* Builds the switch statement in BFN, which is essentially accessing the
+     function table based on the top of the stack. *)
   Function switch (fn_table : list JSML.JSMProgram) :=
     match fn_table with
     | [] => stack_top (* maybe delete argument? *)
-    | hd :: tl => if_else (bfn_dec 1 (switch tl)) (bfn_left 1 kr & delete 0 & bfn_of_jsm hd & stack_top)
+    | hd :: tl => 
+        if_else_val (bfn_dec 1 (switch tl)) 
+        (bfn_left 1 kr & delete 0 & bfn_of_jsmp hd & stack_top)
     end.
   
-  (* JSML -> BFN. Stub. *)
+  (* Compiles the JSM function table to a loop that unpacks the first item on
+     the stack, performs a while loop with the function table switch. *)
   Function bfn_of_jsm_table (fn_table : list JSML.JSMProgram) :=
     match fn_table with
     | [] => bfn_end
-    | hd :: tl => unpack_until_nat & kl & bfn_right 1 (bfn_loop (bfn_dec 1 (switch fn_table)) (unpack_until_nat & kl & bfn_right 1 bfn_end))
+    | hd :: tl => 
+        unpack_until_nat & kl & 
+        bfn_right 1 (bfn_loop (bfn_dec 1 (switch fn_table))
+        (unpack_until_nat & kl & bfn_right 1 bfn_end))
     end.
 
-  Eval compute in debug_bfn (bfn_of_jsm [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 573.
+  (* The full BFN program runs main, and then simply goes into the function
+     table loop (due to jump semantics). *)
+  Function bfn_of_jsm (jsm : JSML.JSMProgram * list JSML.JSMProgram) :=
+    let (main, fn_table) := jsm in
+    bfn_of_jsmp main & bfn_of_jsm_table fn_table.
 
-  Example bfn_of_jsml_push :
-    interpret_bfn (bfn_of_jsm [JSML.push 2; JSML.push 3; JSML.out]) [] 100 = Some [3].
+  (* TESTS *)
+  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.push 3; JSML.push 4; JSML.push 5; JSML.pack 6; JSML.pack 2; JSML.unpack]) [] 573.
+
+  Example bfn_of_jsmpl_push :
+    interpret_bfn (bfn_of_jsmp [JSML.push 2; JSML.push 3; JSML.out]) [] 100 = Some [3].
   Proof. auto. Qed.
 
-  Example bfn_of_jsm1_del_0 :
-    interpret_bfn (bfn_of_jsm [JSML.push 10; JSML.push 20; JSML.del 0; JSML.out]) [] 700 = Some [10].
+  Example bfn_of_jsmp1_del_0 :
+    interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 0; JSML.out]) [] 700 = Some [10].
   Proof. auto. Qed.
 
-  Example bfn_of_jsm1_del_1 :
-    interpret_bfn (bfn_of_jsm [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
+  Example bfn_of_jsmp1_del_1 :
+    interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
   Proof. auto. Qed. 
 
-  Example bfn_of_jsm1_del_1 :
-    interpret_bfn (bfn_of_jsm [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
+  Example bfn_of_jsmp1_del_1 :
+    interpret_bfn (bfn_of_jsmp [JSML.push 10; JSML.push 20; JSML.del 1; JSML.out]) [] 1700 = Some [20].
   Proof. auto. Qed.
 
-  Eval compute in debug_bfn (bfn_of_jsm [JSML.push 5; JSML.push 2; JSML.push 3; JSML.del 1; JSML.out]) [] 2000.
-  Eval compute in debug_bfn (bfn_of_jsm [JSML.push 5; JSML.push 2; JSML.push 3; JSML.del 2; JSML.out]) [] 350.
-  Eval compute in debug_bfn (bfn_of_jsm [JSML.push 1; JSML.push 2; JSML.del 1; JSML.out]) [] .
-  Eval compute in bfn_of_jsm [JSML.push 1].
-  Eval compute in interpret_bfn (bfn_of_jsm [JSML.push 1; JSML.push 2; JSML.out]) [] 50.
+  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 5; JSML.push 2; JSML.push 3; JSML.del 1; JSML.out]) [] 2000.
+  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 5; JSML.push 2; JSML.push 3; JSML.del 2; JSML.out]) [] 350.
+  Eval compute in debug_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.del 1; JSML.out]) [] .
+  Eval compute in bfn_of_jsmp [JSML.push 1].
+  Eval compute in interpret_bfn (bfn_of_jsmp [JSML.push 1; JSML.push 2; JSML.out]) [] 50.
 
-  Example bfn_of_jsm1 :
-    interpret_bfn (bfn_of_jsm [JSML.push 1]) [] 20 = Some [].
+  Example bfn_of_jsmp1 :
+    interpret_bfn (bfn_of_jsmp [JSML.push 1]) [] 20 = Some [].
   Proof. simpl. auto. Qed.
 End BFN.
