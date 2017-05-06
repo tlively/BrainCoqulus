@@ -151,13 +151,12 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Definition from_scratch := bfn_left (KELL_SIZE - 1) bfn_end.
   Definition to_scratch_val := bfn_right (KELL_SIZE - 2) bfn_end.
   Definition from_scratch_val := bfn_left (KELL_SIZE - 2) bfn_end.
-  
+
   Definition copy_to_scratch (offset:nat):BFN :=
     let move := KELL_SIZE - 1 - offset in
     bfn_right offset (bfn_loop (bfn_dec 1 (bfn_right move (bfn_inc 1 (bfn_left move bfn_end)))) (bfn_left offset bfn_end)).
-     
 
-   Definition copy_cell (offset:nat):BFN :=
+  Definition copy_cell (offset:nat):BFN :=
     copy_to_scratch(offset) & to_scratch & (bfn_loop (bfn_dec 1 from_scratch & bfn_right offset bfn_end) from_scratch).
   
   Definition get (n:nat):BFN :=
@@ -179,7 +178,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     | 0 => prev & empty_item & mark
     | S _ => (repeat (n-1) (prev & kr & mark & kl)) & prev & prev & shift_item & next & mark & next_marked & (bfn_loop (kl & shove_zero_gap & kr & unmark & next & mark & next_marked) (prev_marked & stack_top))
     end.
-    
 
   Definition if_else (nonzero zero : BFN) :=
     to_scratch & bfn_loop (bfn_dec 1 bfn_end) (bfn_inc 1 kr) & bfn_loop (bfn_dec 1 bfn_end) kl & from_scratch & bfn_loop nonzero to_scratch & kr & bfn_loop (from_scratch & kl & bfn_inc 1 to_scratch & kr & bfn_dec 1 bfn_end) kl & bfn_loop (from_scratch & zero & to_scratch) from_scratch.
@@ -211,17 +209,6 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Definition unpack_until_nat : BFN :=
     kl & bfn_dec 1 (bfn_loop (bfn_inc 1 kr & unpack & kl & bfn_dec 1 bfn_end) (bfn_inc 1 kr)).
   
-  Definition stack_top :=
-    kr & bfn_loop (bfn_loop kr kr) kl.
-  
-  (* FIXME *)
-  Definition delete (n : nat) :=
-    bfn_end.
-  
-  (* FIXME *)
-  Definition get (n : nat) :=
-    bfn_end.
-  
   Definition cond_get (n k : nat) :=
     bfn_end.
     
@@ -229,7 +216,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Function bfn_of_jsmp (main : JSML.JSMProgram) :=
     match main with
     | JSML.push n :: jsmp => push n & bfn_of_jsmp jsmp 
-    | JSML.del n :: jsmp => delete n & bfn_of_jsmp jsmp
+    | JSML.del n :: jsmp => del n & bfn_of_jsmp jsmp
     | JSML.get n :: jsmp => get n & bfn_of_jsmp jsmp
     | JSML.pack n :: jsmp => pack n & bfn_of_jsmp jsmp
     | JSML.unpack :: jsmp => unpack & bfn_of_jsmp jsmp
@@ -248,7 +235,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     | [] => stack_top (* maybe delete argument? *)
     | hd :: tl => 
         if_else_val (bfn_dec 1 (switch tl)) 
-        (bfn_left 1 kr & delete 0 & bfn_of_jsmp hd & stack_top)
+        (bfn_left 1 kr & del 0 & bfn_of_jsmp hd & stack_top)
     end.
   
   (* Compiles the JSM function table to a loop that unpacks the first item on
