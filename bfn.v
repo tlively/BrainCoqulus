@@ -151,14 +151,36 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   Definition from_scratch := bfn_left (KELL_SIZE - 1) bfn_end.
   Definition to_scratch_val := bfn_right (KELL_SIZE - 2) bfn_end.
   Definition from_scratch_val := bfn_left (KELL_SIZE - 2) bfn_end.
-  (*
+  
+  Definition copy_to_scratch (offset:nat):BFN :=
+    let move := KELL_SIZE - 1 - offset in
+    bfn_right offset (bfn_loop (bfn_dec 1 (bfn_right move (bfn_inc 1 (bfn_left move bfn_end)))) (bfn_left offset bfn_end)).
+     
+
    Definition copy_cell (offset:nat):BFN :=
-    copy_to_scratch(offset) & to_scratch & (bfn_loop (bfn_dec 1 from_scratch & bfn_right offset bfn) from_scratch).
+    copy_to_scratch(offset) & to_scratch & (bfn_loop (bfn_dec 1 from_scratch & bfn_right offset bfn_end) from_scratch).
   
   Definition get (n:nat):BFN :=
-    unmark & kr & mark & kl & (repeat (n+1) prev) & kr & mark & (bfn_loop ((copy_cell 0) & (copy_cell 1) & next_marked & unmark & prev_marked & unmark & kr & (mark bfn_end)) next_marked).
-  *)
+    unmark & kr & mark & kl & (repeat (n+1) prev) & kr & mark & (bfn_loop ((copy_cell 0) & (copy_cell 1) & next_marked & unmark & prev_marked & unmark & kr & (mark & bfn_end)) next_marked).
   
+  Definition empty_kell := (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_left 4 (bfn_right 2 (bfn_inc 1 (bfn_left 2 bfn_end)))))))))))).  
+  Definition empty_item :=
+    empty_kell & mark & kr & (bfn_loop (empty_kell & kr) (prev_marked & unmark)).
+  Definition shift_kell := (bfn_right 4 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 5 (bfn_left 1 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 2 (bfn_loop (bfn_dec 1 bfn_end) (bfn_right 1 (bfn_loop (bfn_dec 1 (bfn_left 1 (bfn_inc 1 (bfn_right 1 bfn_end)))) (bfn_left 1 (bfn_right 3 (bfn_inc 1 (bfn_left 6 bfn_end))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))).
+  Definition sik := shift_kell & kr & kr & (bfn_loop (kl & shift_kell & kr & kr) (kl & prev)).   
+  Definition shift_item := next & kl & (bfn_loop (sik & kl) sik).
+
+  Definition stack_top := kr & (bfn_loop (bfn_loop kr kr) kl).
+
+  Definition shove_zero_gap := bfn_left 2 (bfn_loop ((bfn_left (KELL_SIZE - 2) shift_item) & (bfn_left 2 bfn_end)) (bfn_right 2 kl) & shift_item).
+
+  Definition del (n : nat):BFN :=
+    match n with
+    | 0 => prev & empty_item & mark
+    | S _ => (repeat (n-1) (prev & kr & mark & kl)) & prev & prev & shift_item & next & mark & next_marked & (bfn_loop (kl & shove_zero_gap & kr & unmark & next & mark & next_marked) (prev_marked & stack_top))
+    end.
+    
+
   Definition if_else (nonzero zero : BFN) :=
     to_scratch & bfn_loop (bfn_dec 1 bfn_end) (bfn_inc 1 kr) & bfn_loop (bfn_dec 1 bfn_end) kl & from_scratch & bfn_loop nonzero to_scratch & kr & bfn_loop (from_scratch & kl & bfn_inc 1 to_scratch & kr & bfn_dec 1 bfn_end) kl & bfn_loop (from_scratch & zero & to_scratch) from_scratch.
 

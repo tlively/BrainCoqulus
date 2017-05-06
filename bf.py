@@ -126,12 +126,15 @@ def closingBracket(rest):
 def toCoq(bf_string):
     if len(bf_string) == 0:
         return 'bfn_end'
-    split = firstDifferent(bf_string)
-    c, rest = bf_string[0], bf_string[split:]
-    if c == '[':
+
+    if bf_string[0] == '[':
+        rest = bf_string[1:]
         closing = closingBracket(rest)
         body, end = rest[:closing], rest[closing+1:]
         return '(bfn_loop {} {})'.format(toCoq(body), toCoq(end))
+
+    split = firstDifferent(bf_string)
+    c, rest = bf_string[0], bf_string[split:]
 
     bfn_token = {
         '<': 'bfn_left',
@@ -142,7 +145,6 @@ def toCoq(bf_string):
         ',': 'bfn_in'
     }[c]
     return '({} {} {})'.format(bfn_token, split, toCoq(rest))
-print toCoq('>>>[++<]>>-')
 
 
 kl = KELL_SIZE * '<'
@@ -171,6 +173,11 @@ sik = shift_kell + 2 * kr + '[' + kl + shift_kell + 2 * kr + ']' + kl + prev
 shift_item = next + kl + '[' + sik + kl + ']' + sik
 shift_scratch_left = kl + '[-' + kr + '+' + kl + ']' + kr
 deref = (KELL_SIZE - 1) * '>' + '[' + kr + shift_scratch_left + '-]' + (KELL_SIZE - 1) * '<'
+
+shove_zero_gap = '<<[' + (KELL_SIZE-2) * '<' + shift_item + '<<]>>' + kl + shift_item
+
+def toDefinition(name, s): return 'Definition {} := {}.'.format(name, toCoq(s))
+
 
 
 
@@ -211,7 +218,6 @@ def pack(n):
 stack_top = kr + '[[' + kr + ']' + kr + ']' + kl
 
 
-shove_zero_gap = '<<[' + (KELL_SIZE-2) * '<' + shift_item + '<<]>>' + kl + shift_item
 add_kell = '+>++>+>>'
 
 to_scratch = (KELL_SIZE - 1) * '>'
@@ -225,6 +231,7 @@ def copy_cell(offset):
     prog += to_scratch + '[-' + from_scratch + offset * '>' + '+' + offset * '<' + next_marked + offset * '>' + '+' + offset * '<' + prev_marked + to_scratch + ']' + from_scratch
     return prog
 
+
 def get(n):
     prog = unmark + kr + mark + kl + (n+1) * prev + kr + mark
     prog += '[' + copy_cell(0) + copy_cell(1) + next_marked + unmark + prev_marked + unmark + kr + mark + ']'
@@ -232,7 +239,7 @@ def get(n):
 
 # look at the value of the previous item. NOTE: this assumes that the last item
 # is NOT a tuple; it gets the second element on the stack.
-cond_get = prev + kr + '>' + garbage_if_else('<' + stack_top, '<' + stack_top + get(1))
+#cond_get = prev + kr + '>' + garbage_if_else('<' + stack_top, '<' + stack_top + get(1))
 
 bfm = BFMachine()
 bfm.bootstrap()
@@ -272,3 +279,4 @@ bfm.print_state()
 # bfm.print_state()
 # bfm.run_code(cond_get, 4500)
 # bfm.print_state()
+
