@@ -311,7 +311,7 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
   
   Eval compute in bfn_state_of_jsm_state (JSML.running [] [] (Stack.stuple (Stack.snat 3 (Stack.snat 2 Stack.snil)) (Stack.snat 1 Stack.snil)) [] []).
   
-  Lemma bfn_of_jsm_correct:
+  (*Lemma bfn_of_jsm_correct:
     forall (jsm: JSML.JSMProgram * list JSML.JSMProgram) (input output: list nat),
       (exists fuel, JSML.interpret_jsm jsm input fuel = Some output) ->
       (exists fuel, interpret_bfn (bfn_of_jsm jsm) input fuel = Some output).
@@ -322,5 +322,5 @@ Definition debug_bfn (prog: BFN) (input: list nat) (fuel: nat) :=
     unfold interpret_bfn, JSML.interpret_jsm.
     replace (exec_init (bfn_of_jsm jsm) input) with
     (bfn_state_of_jsm_state (JSML.exec_init jsm input)) by auto.
-
+*)
 End BFN.
