@@ -168,7 +168,11 @@ empty_kell = zero_kell + (KELL_SIZE - 2) * '>' + '+' + (KELL_SIZE - 2) * '<'
 empty_item = empty_kell + mark + kr + '[' + empty_kell + kr + ']' + prev_marked + unmark
 
 def scc_right_n(n): return (n) * '>' + n * ('<' + scc_right)
-shift_kell = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + unmark + kl
+shift_cell = kr + '[-' + kl + '+' + kr + ']' + kl
+
+shift_kell_old = KELL_SIZE * (scc_right_n(KELL_SIZE) + '>') + unmark + kl
+shift_kell = zero_kell + shift_cell + '>' + shift_cell + '>' + '+' + kr + '[-]+' + '<<' + kl
+
 sik = shift_kell + 2 * kr + '[' + kl + shift_kell + 2 * kr + ']' + kl + prev
 shift_item = next + kl + '[' + sik + kl + ']' + sik
 shift_scratch_left = kl + '[-' + kr + '+' + kl + ']' + kr
@@ -243,8 +247,13 @@ def get(n):
 
 bfm = BFMachine()
 bfm.bootstrap()
-# bfm.run_code(push(7) + push(3) + push(4) + push(0), 1500)
-# bfm.print_state()
+bfm.run_code(push(2) + push(7) + push(4), 4500)
+bfm.print_state()
+#bfm.run_code( zero_kell + shift_cell + '>' + shift_cell + '>' + '+' + kr + '+' + '<<' + kl, 4500)
+#bfm.run_code( kl + kl + zero_kell + shift_cell, 4500)
+#bfm.run_code( kl + kl + shift_kell , 4500)
+bfm.run_code(delete(2) , 4500)
+bfm.print_state()
 
 unpack_until_nat = kl + '-' + '[+' + kr + unpack + kl + '-]+' + kr
 
@@ -255,17 +264,17 @@ inc = kl + '>+<' + kr
 dec = kl + '>-<' + kr
 read = kl + '>,<' + kr
 
-main = push(0) + push(0) + push(1) + push(0) + push(2) + out
+#main = push(0) + push(0) + push(1) + push(0) + push(2) + out
 # prog = unpack_until_nat + kl + '>[-' + garbage_if_else(garbage_if_else('', '<' + kr + delete(0) + out), '<' + kr + delete(0) + inc * 3 + out) + unpack_until_nat + kl + '>]'
-prog_simpl = unpack_until_nat + kl + '>[-' + garbage_if_else_val('-' + garbage_if_else_val('-' + stack_top, '<' + kr + delete(0) + inc * 5 + out + delete(0) + stack_top), '<' + kr + delete(0) + inc * 3 + out + delete(0) + stack_top) + unpack_until_nat + kl + '>]'
+#prog_simpl = unpack_until_nat + kl + '>[-' + garbage_if_else_val('-' + garbage_if_else_val('-' + stack_top, '<' + kr + delete(0) + inc * 5 + out + delete(0) + stack_top), '<' + kr + delete(0) + inc * 3 + out + delete(0) + stack_top) + unpack_until_nat + kl + '>]'
 # prog_very_simpl = unpack_until_nat + kl + '>'
 # bfm.run_code(get(1), 1500)
 # bfm.print_state()
 
-bfm.run_code(main, 4000)
-bfm.print_state()
-bfm.run_code(prog_simpl, 5000)
-bfm.print_state()
+#bfm.run_code(main, 4000)
+#bfm.print_state()
+#bfm.run_code(prog_simpl, 5000)
+#bfm.print_state()
 # bfm.run_code(unpack_until_nat + kl + '>', 200)
 # bfm.print_state()
 # bfm.run_code(unpack, 200)
