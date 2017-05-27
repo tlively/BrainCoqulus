@@ -242,6 +242,8 @@ Module SML.
               del 2; del 2; call]] in
     lib ++ enc_list_fns.
 
+  Eval compute in runtime_lib.
+
   Lemma inc_fid_correct: nth_error runtime_lib inc_fid = Some [inc].
   Proof. auto. Qed.
 

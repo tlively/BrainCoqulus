@@ -10,6 +10,13 @@ Module Stack.
   | snat (n: nat) (s: Stack)
   | stuple (t: Stack) (s: Stack).
 
+  Fixpoint len (s: Stack): nat :=
+    match s with
+    | snil => 0
+    | snat _ s'
+    | stuple _ s' => S (len s')
+    end.
+
   Function prefix (n: nat) (s: Stack): option Stack :=
     match n with
     | 0 => Some snil

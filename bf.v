@@ -9,8 +9,8 @@ Require Import Strings.Ascii.
 Require Import Coq.Program.Tactics.
 Import ListNotations.
 
-Load bfn.
-Import BFN.
+Load jsml.
+Load bftape.
 
 Module BF.
 
@@ -25,9 +25,29 @@ Module BF.
   | bf_in : BF -> BF    (* , *)
   | bf_loop : BF -> BF -> BF.  (* [...] *)
 
+  Fixpoint bf_append bf1 bf2 :=
+    match bf1 with
+    | bf_end => bf2
+    | bf_right bf' => bf_right (bf_append bf' bf2)
+    | bf_left bf' => bf_left (bf_append bf' bf2)
+    | bf_inc bf' => bf_inc (bf_append bf' bf2)
+    | bf_dec bf' => bf_dec (bf_append bf' bf2)
+    | bf_out bf' => bf_out (bf_append bf' bf2)
+    | bf_in bf' => bf_in (bf_append bf' bf2)
+    | bf_loop inner bf' => bf_loop inner (bf_append bf' bf2)
+    end.
+
+  Notation "a & f" := (bf_append a f) (at level 50, left associativity).
+
+  Fixpoint repeat (n: nat) (bf: BF): BF :=
+    match n with
+    | 0 => bf_end
+    | S m => bf & (repeat m bf)
+    end.
+
   Section BFPrinting.
 
-    Function chars_of_bf (bf: BF): list ascii :=
+    Fixpoint chars_of_bf (bf: BF): list ascii :=
       match bf with
       | bf_end => []
       | bf_right bf' =>  ">"%char :: (chars_of_bf bf')
@@ -40,7 +60,7 @@ Module BF.
         "["%char :: (chars_of_bf inner) ++ ["]"%char] ++ (chars_of_bf bf')
       end.
 
-    Function print_bf (bf: BF): string :=
+    Definition print_bf (bf: BF): string :=
       Parse.string_of_chars (chars_of_bf bf).
 
     Example print_all_bf_commands:
@@ -58,7 +78,7 @@ Module BF.
     Local Definition ParseState := @Parse.ParseState BF.
     Local Definition chars_of_string := Parse.chars_of_string.
 
-    Function parse_bf_state (l: list ascii): ParseState :=
+    Fixpoint parse_bf_state (l: list ascii): ParseState :=
       match l with
       | [] => Parse.ok bf_end []
       | hd :: tl =>
@@ -83,11 +103,17 @@ Module BF.
         end
       end.
 
-    Function parse_bf (str: string): option BF :=
+    Definition parse_bf (str: string): option BF :=
       match parse_bf_state (chars_of_string str) with
       | Parse.error => None
       | Parse.ok _ (_ :: _) => None
       | Parse.ok bf [] => Some bf
+      end.
+
+    Definition parse_bf_def (str: string): BF :=
+      match parse_bf str with
+      | Some bf => bf
+      | None => bf_end
       end.
 
     Example parse_all_bf_commands:
@@ -119,51 +145,17 @@ Module BF.
     auto. Qed.
 
   End BFParsing.
-(*
-  Lemma bf_helper (bf1 bf1': BF):
-    parse_bf_state (chars_of_bf bf1) = Parse.ok bf1' [] ->
-    bf1 = bf1'.
-  Proof.
-  Admitted.
 
-  Lemma bf_print_parse_loop (bf1 bf2: BF):
-    forall bf1' bf2',
-      parse_bf_state (chars_of_bf bf1) = Parse.ok bf1' [] ->
-      parse_bf_state (chars_of_bf bf2) = Parse.ok bf2' [] ->
-      parse_bf_state ("["%char :: (chars_of_bf bf1) ++ ["]"%char]
-                         ++ (chars_of_bf bf2))
-      = Parse.ok (bf_loop bf1 bf2) [].
-  Proof.
-  Admitted.
-
-  Lemma bf_print_parse_chars_inv (bf: BF):
-    parse_bf_state (chars_of_bf bf) = Parse.ok bf [].
-  Proof.
-    induction bf; auto;
-      rewrite chars_of_bf_equation, parse_bf_state_equation;
-      try (rewrite IHbf; auto).
-    now apply (bf_print_parse_loop _ _ bf1 bf2).
-  Qed.
-
-  (* Removes the parser from the trusted computing base *)
-  Theorem bf_print_parse_inv (bf: BF): parse_bf (print_bf bf) = Some bf.
-  Proof.
-    unfold parse_bf, print_bf; rewrite Parse.chars_of_string_of_chars_inv.
-    now rewrite bf_print_parse_chars_inv.
-  Qed.
-  *)
-
-  (* BF Interpreter *)
   Inductive BFState : Type :=
-    | running (ast: BF)
-              (resets: list BF)
-              (ptr: nat)
-              (tape: BFTape.Tape)
-              (input: list nat)
-              (output: list nat)
-    | halted (output: list nat).
+  | running (ast: BF)
+            (resets: list BF)
+            (ptr: nat)
+            (tape: BFTape.Tape)
+            (input: list nat)
+            (output: list nat)
+  | halted (output: list nat).
 
-  Function bf_step (s: BFState): BFState :=
+  Fixpoint bf_step (s: BFState): BFState :=
     match s with
     | halted _ => s
     | running bf resets ptr tape input output =>
@@ -199,27 +191,29 @@ Module BF.
       end
     end.
 
-  Function exec_init (prog: BF) (input: list nat): BFState :=
+  Definition exec_init (prog: BF) (input: list nat): BFState :=
     running prog [] 0 BFTape.empty input [].
 
-  Definition interpret_bf (prog: BF) (input: list nat) (fuel: nat): option (list nat) :=
+  Definition interpret_bf (prog: BF) (input: list nat) (fuel: nat):
+    option (list nat) :=
     match Utils.run bf_step (exec_init prog input) fuel with
     | running _ _ _ _ _ _ => None
     | halted output => Some output
     end.
-  Function string_of_nats (out: list nat): string :=
+
+  Fixpoint string_of_nats (out: list nat): string :=
     match out with
     | [] => EmptyString
     | n :: ns' => String (ascii_of_nat n) (string_of_nats ns')
     end.
 
-  Function nats_of_string (str: string): list nat :=
+  Fixpoint nats_of_string (str: string): list nat :=
     match str with
     | EmptyString => []
     | String a str' => nat_of_ascii a :: (nats_of_string str')
     end.
 
-  Function interpret_bf_readable (prog: string) (input: string) (f: nat):
+  Fixpoint interpret_bf_readable (prog: string) (input: string) (f: nat):
     string :=
     match parse_bf prog with
     | None => EmptyString
@@ -236,108 +230,122 @@ Module BF.
                         --------.>+. newline in next cell" "" 401 =
     "Hello World!"%string. Proof. auto. Qed.
 
-  Function bf_of_bfn (bfn: BFN) {measure bfn_weight bfn}: BF.BF :=
-    match bfn with
-    | bfn_end => bf_end
-    | bfn_right 0 bfn'
-    | bfn_left 0 bfn'
-    | bfn_inc 0 bfn'
-    | bfn_dec 0 bfn'
-    | bfn_out 0 bfn'
-    | bfn_in 0 bfn' => bf_of_bfn bfn'
-    | bfn_right (S n) bfn' => bf_right (bf_of_bfn (bfn_right n bfn'))
-    | bfn_left (S n) bfn' => bf_left (bf_of_bfn (bfn_left n bfn'))
-    | bfn_inc (S n) bfn' => bf_inc (bf_of_bfn (bfn_inc n bfn'))
-    | bfn_dec (S n) bfn' => bf_dec (bf_of_bfn (bfn_dec n bfn'))
-    | bfn_out (S n) bfn' => bf_out (bf_of_bfn (bfn_out n bfn'))
-    | bfn_in (S n) bfn' => bf_in (bf_of_bfn (bfn_in n bfn'))
-    | bfn_loop inner bfn' => bf_loop (bf_of_bfn inner) (bf_of_bfn bfn')
-    | label _ bfn' => bf_of_bfn bfn'     
+  Section BFofJSM.
+
+    (* value logical cells on both sides with separators at
+    `nest_level'. Values of separator cells set to 0. *)
+    Fixpoint list_of_stack (s: Stack.Stack) (nest_level: nat): list nat :=
+      match s with
+      | Stack.snil => []
+      | Stack.snat n Stack.snil => [(S nest_level); n]
+      | Stack.stuple inner Stack.snil => list_of_stack inner (S nest_level)
+      | Stack.snat n s' =>
+        (list_of_stack s' nest_level)
+          ++ (nest_level :: 0 :: [S nest_level; n])
+      | Stack.stuple inner s' =>
+        (list_of_stack s' nest_level)
+          ++ (nest_level :: 0 :: (list_of_stack inner (S nest_level)))
+      end.
+
+    Definition tape_of_stack (s: Stack.Stack): BFTape.Tape :=
+      BFTape.tape_of_list ([0;0] ++ (list_of_stack s 0) ++ [0;0]).
+
+    Definition debug_bf (prog: BF) (tape: BFTape.Tape) (ptr size: nat)
+               (input: list nat) (fuel: nat):
+      (string * list string * list (nat * nat)) :=
+      match Utils.run bf_step (running prog [] ptr tape input []) fuel with
+      | halted _ => (""%string, [], [])
+      | running bf rst ptr tape _ _ =>
+        let l := combine (BFTape.list_of_tape tape size) (seq 0 size) in
+        let mapper (x: nat * nat) :=
+            let (v, i) := x in
+            (v, if i =? ptr then 1 else 0) in
+        (print_bf bf, map print_bf rst, map mapper l)
+      end.
+
+    Definition push (n: nat): BF :=
+      (parse_bf_def ">>[-]+>[-]") & (repeat n (parse_bf_def "+")) &
+      (parse_bf_def ">[-]>[-]<").
+
+    Definition del (n: nat): BF := bf_end.
+
+    Definition get (n: nat): BF :=
+      (* Move to start *)
+      (repeat (S n) (parse_bf_def "<<[<<]")) & (parse_bf_def ">>") &
+      (* Move tag to end *)
+      (bf_loop ((repeat (S n) (parse_bf_def ">>[>>]")) &
+                (parse_bf_def ">>+<<") &
+                (repeat (S n) (parse_bf_def "<<[<<]")) &
+                (parse_bf_def ">>-")) bf_end) &
+      (* Move val to end *)
+      (bf_right (bf_loop ((parse_bf_def ">[>>]") &
+                          (repeat n (parse_bf_def ">>[>>]")) &
+                          (parse_bf_def ">>>+<<<") &
+                          (repeat (S n) (parse_bf_def "<<[<<]")) &
+                          (parse_bf_def ">-")) bf_end)) &
+      (* Move next tag and value to end *)
+      (bf_right
+         (bf_loop (
+              (* Mark new end *)
+              (repeat (n+2) (parse_bf_def ">>[>>]")) & (bf_inc bf_end) &
+              (* Move to start *)
+              (repeat (n+2) (parse_bf_def "<<[<<]")) & (parse_bf_def ">>") &
+              (* Move tag to end *)
+              (bf_loop ((repeat (n+2) (parse_bf_def ">>[>>]")) &
+                        (parse_bf_def "<<+") &
+                        (repeat (n+2) (parse_bf_def "<<[<<]")) &
+                        (parse_bf_def ">>-")) bf_end) &
+              (* Move val to end *)
+              (bf_right (bf_loop ((parse_bf_def ">[>>]") &
+                                  (repeat (S n) (parse_bf_def ">>[>>]")) &
+                                  (parse_bf_def "<+<") &
+                                  (repeat (n+2) (parse_bf_def "<<[<<]")) &
+                                  (bf_right (bf_dec (bf_end)))) bf_end)) &
+              (* Mark previous tag and value *)
+              (parse_bf_def "<<<+>+>") &
+              (* Unmark end tag *)
+              (repeat (n+2) (parse_bf_def ">>[>>]")) & (parse_bf_def "<<-") &
+              (repeat (n+2) (parse_bf_def "<<[<<]")) &
+              (* Move to new start *)
+              (parse_bf_def ">>")) bf_end)) &
+      (* Mark last tag and value *)
+      (parse_bf_def "<+<+").
+    (* TODO: Deal with hole *)
+
+    Definition pack (n: nat): BF :=
+      if n <=? 1 then bf_end else
+        (repeat (n-1) (parse_bf_def "<<<<[+>>+<<<<<<]+>>+<<")) &
+        (parse_bf_def "<<<<[+>>+<<<<<<]>>+[>>]").
+
+    Definition unpack: BF := parse_bf_def "<<[<<]>>[->>]".
+
+    Definition cond_get (n k: nat) :=
+      bf_end.
+
+    Definition inc: BF := parse_bf_def "<+>".
+
+    Definition dec: BF := parse_bf_def "<->".
+
+    Definition read: BF := parse_bf_def ">>[-]+>,>[-]>[-]<".
+
+    Definition out: BF := parse_bf_def "<.>".
+
+  (* Compiles a single JSMProgram to BFN. *)
+  Function bf_of_jsmp (main: JSML.JSMProgram) :=
+    match main with
+    | [] => bf_end
+    | JSML.push n :: jsmp => push n & bf_of_jsmp jsmp
+    | JSML.del n :: jsmp => del n & bf_of_jsmp jsmp
+    | JSML.get n :: jsmp => get n & bf_of_jsmp jsmp
+    | JSML.pack n :: jsmp => pack n & bf_of_jsmp jsmp
+    | JSML.unpack :: jsmp => unpack & bf_of_jsmp jsmp
+    | JSML.cond_get n k :: jsmp => cond_get n k & bf_of_jsmp jsmp
+    | JSML.inc :: jsmp => inc & bf_of_jsmp jsmp
+    | JSML.dec :: jsmp => dec & bf_of_jsmp jsmp
+    | JSML.read :: jsmp => read & bf_of_jsmp jsmp
+    | JSML.out :: jsmp => out & bf_of_jsmp jsmp
     end.
-  Proof.
-    all: intros; auto; simpl; omega.
-  Defined.
 
-  Example translate_left_bfn:
-    parse_bf "<<<<+++++++" =
-    Some (bf_of_bfn (bfn_left 4 (bfn_inc 7 bfn_end))).
-  auto. Qed.
-
-  Lemma bfn_replace_loops:
-    forall (bfn1 bfn2: BFN),
-      bf_of_bfn (bfn_loop bfn1 bfn2) =
-      bf_loop (bf_of_bfn bfn1) (bf_of_bfn bfn2).
-  Proof.
-    intros.
-    rewrite bf_of_bfn_equation.
-    reflexivity.
-  Qed.
-
-  Function bf_state_of_bfn_state (state: BFNState): BFState :=
-    match state with
-    | BFN.halted output => halted output
-    | BFN.running bfn resets ptr tape input output =>
-      running (bf_of_bfn bfn) (map bf_of_bfn resets)
-                     ptr tape input output
-    end.
-
-  Lemma bf_of_bfn_sim_step:
-    forall (s: BFNState),
-      bf_step (bf_state_of_bfn_state s) = bf_state_of_bfn_state (bfn_step s).
-  Proof.
-    intros.
-    destruct s; unfold bf_state_of_bfn_state;
-      [ | rewrite bfn_step_equation; auto ].
-    induction ast.
-    destruct resets;
-      rewrite bfn_step_equation;
-      now unfold bf_state_of_bfn_state.
-    6: destruct input.
-    1-7: induction n;
-      rewrite bf_of_bfn_equation;
-      now rewrite bfn_step_equation.
-    rewrite bf_of_bfn_equation.
-    rewrite bfn_step_equation.
-    unfold bf_step.
-    destruct (BFTape.get tape ptr).
-    now replace (0 =? 0) with true by auto.
-    replace (S n =? 0) with false by auto; simpl.
-    now rewrite bfn_replace_loops.
-  Qed.
-
-  Lemma bf_of_bfn_sim:
-    forall (fuel: nat) (s: BFNState),
-      Utils.run bf_step (bf_state_of_bfn_state s) fuel =
-      bf_state_of_bfn_state (Utils.run bfn_step s fuel).
-  Proof.
-    induction fuel; auto.
-    simpl; intros.
-    rewrite <- IHfuel.
-    now rewrite bf_of_bfn_sim_step.
-  Qed.
-
-  Lemma bf_of_bfn_correct:
-    forall (bfn: BFN) (input output: list nat),
-      (exists fuel, interpret_bfn bfn input fuel = Some output) ->
-      (exists fuel, interpret_bf (bf_of_bfn bfn) input fuel = Some output).
-  Proof.
-    intros.
-    destruct H as [fuel]; exists fuel.
-    rewrite <- H; clear H.
-    unfold interpret_bf, interpret_bfn.
-    replace (exec_init (bf_of_bfn bfn) input) with
-    (bf_state_of_bfn_state (BFN.exec_init bfn input)) by auto.
-    rewrite bf_of_bfn_sim.
-    remember (@Utils.run (BFNState) bfn_step
-                         (BFN.exec_init bfn input) fuel) as result.
-    destruct result;
-      now unfold bf_state_of_bfn_state.
-    Qed.
-
-  (* Compiles Lambda calculus to Brainfuck !!! *)
-  Definition bf_of_lambda (l: Lambda.Lambda): BF :=
-    bf_of_bfn (BFN.bfn_of_jsm (JSML.jsm_of_sm (SML.sml_of_lambda l))).
-
-  Eval compute in bf_of_lambda (Lambda.get_lam Lambda.l_id).
+  End BFofJSM.
 
 End BF.
